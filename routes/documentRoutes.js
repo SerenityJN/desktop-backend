@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import db from "../models/db.js";
+
 const router = express.Router();
-const db = require('../config/database'); // Your database connection
 
 // GET /api/documents/verification-status/:LRN
 router.get('/verification-status/:LRN', async (req, res) => {
@@ -231,4 +232,4 @@ router.get('/student/:LRN', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
