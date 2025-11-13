@@ -1,3 +1,7 @@
+// server.js
+import dotenv from "dotenv";
+dotenv.config();
+
 
 import express from "express";
 import path from "path";
@@ -12,6 +16,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import announcementsRoutes from "./routes/announcementRoutes.js"; // ✅ newly added
 import strandRoutes from "./routes/strandRoutes.js"; // ✅ newly added
 import SecondSemester from "./routes/SecondSemesterRoutes.js";
+import FirstSemester from "./routes/FirstSemesterRoutes.js"
+import documentRoutes from "./routes/documentRoutes.js"
 
 // Configurations
 
@@ -39,8 +45,15 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/announcements", announcementsRoutes); // ✅ added announcement route
 app.use("/api/strands", strandRoutes); // ✅ added announcement route
 app.use("/api/SecondSemester", SecondSemester); // ✅ added announcement route
+app.use("/api/FirstSemester", FirstSemester)
+app.use('/api/documents', documentRoutes);
 
 
+// ✅ Serve frontend files last
+app.use(express.static(path.join(__dirname, "../frontend")));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/login.html"));
+});
 
 // ✅ Start the server
 app.listen(PORT, () => {
