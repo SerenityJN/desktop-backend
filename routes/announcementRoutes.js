@@ -33,6 +33,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       status = "active",
       publish_date,
       expire_date,
+      is_featured,
     } = req.body;
 
     const image = req.file ? req.file.path : null;
@@ -45,8 +46,8 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO announcements 
-        (title, short_description, message, category, image, status, publish_date, expire_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (title, short_description, message, category, image, status, publish_date, expire_date, is_featured)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         short_description || null,
@@ -56,8 +57,11 @@ router.post("/", upload.single("image"), async (req, res) => {
         status,
         publish_date || new Date(),
         expire_date || null,
+        is_featured,
       ]
     );
+
+    console.log(result);
 
     res.json({
       success: true,
@@ -70,6 +74,7 @@ router.post("/", upload.single("image"), async (req, res) => {
         category,
         image,
         status,
+        is_featured,
       },
     });
   } catch (err) {
@@ -87,6 +92,7 @@ router.get("/", async (req, res) => {
       "SELECT * FROM announcements ORDER BY publish_date DESC"
     );
     res.json(rows);
+    console.log(rows);
   } catch (err) {
     console.error("❌ Error fetching announcements:", err);
     res.status(500).json({ message: "Server error." });
@@ -102,7 +108,7 @@ router.get("/latest", async (req, res) => {
       `SELECT * FROM announcements 
        WHERE status = 'active' 
        ORDER BY publish_date DESC 
-       LIMIT 3`
+       LIMIT 10`
     );
     res.json(rows);
   } catch (err) {
@@ -146,6 +152,8 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       status,
       publish_date,
       expire_date,
+      is_featured,
+      
     } = req.body;
 
     // Fetch existing record
@@ -175,7 +183,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     await db.query(
       `UPDATE announcements 
        SET title = ?, short_description = ?, message = ?, category = ?, 
-           image = ?, status = ?, publish_date = ?, expire_date = ?, 
+           image = ?, status = ?, publish_date = ?, expire_date = ?, is_featured = ?, 
            updated_at = NOW()
        WHERE id = ?`,
       [
@@ -187,6 +195,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
         status,
         publish_date,
         expire_date,
+        is_featured,
         id,
       ]
     );

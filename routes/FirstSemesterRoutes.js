@@ -1,14 +1,17 @@
-// routes/SecondSemester.js
+// routes/FirstSemester.js
 import express from "express";
 import db from "../models/db.js";
 
 const router = express.Router();
 
-// Get enrollment status AND dates
+// Get 1st semester enrollment status AND dates
+// In your FirstSemester.js and SecondSemester.js
+
+// Get enrollment status WITH dates
 router.get("/status", async (req, res) => {
   try {
     const [rows] = await db.query(
-      "SELECT value, start_date, end_date FROM second_semester_settings WHERE name = 'second_sem_enrollment'"
+      "SELECT value, start_date, end_date FROM first_semester_settings WHERE name = 'first_sem_enrollment'"
     );
     
     if (rows.length === 0) {
@@ -50,22 +53,22 @@ router.get("/status", async (req, res) => {
   }
 });
 
-// Toggle enrollment status
+// Toggle 1st semester enrollment status
 router.post("/toggle", async (req, res) => {
   try {
     const { status } = req.body;
     await db.query(
-      "UPDATE second_semester_settings SET value = ? WHERE name = 'second_sem_enrollment'",
+      "UPDATE first_semester_settings SET value = ? WHERE name = 'first_sem_enrollment'",
       [status]
     );
-    res.json({ message: `Enrollment status updated to ${status}` });
+    res.json({ message: `1st semester enrollment ${status}` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Save 2nd semester dates
+// Save 1st semester dates
 router.post("/dates", async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
@@ -75,11 +78,11 @@ router.post("/dates", async (req, res) => {
     }
     
     await db.query(
-      "UPDATE second_semester_settings SET start_date = ?, end_date = ? WHERE name = 'second_sem_enrollment'",
+      "UPDATE first_semester_settings SET start_date = ?, end_date = ? WHERE name = 'first_sem_enrollment'",
       [startDate || null, endDate || null]
     );
     
-    res.json({ message: "2nd semester dates saved successfully" });
+    res.json({ message: "1st semester dates saved successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
