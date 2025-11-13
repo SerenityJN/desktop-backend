@@ -41,11 +41,6 @@ app.use("/api/strands", strandRoutes); // ✅ added announcement route
 app.use("/api/SecondSemester", SecondSemester); // ✅ added announcement route
 
 
-// ✅ Serve frontend files last
-app.use(express.static(path.join(__dirname, "../frontend")));
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/login.html"));
-});
 
 // ✅ Start the server
 app.listen(PORT, () => {
