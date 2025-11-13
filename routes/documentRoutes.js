@@ -96,19 +96,6 @@ router.post('/verify', async (req, res) => {
       );
     }
 
-    // Log the verification action (optional but recommended)
-    try {
-      await db.execute(
-        `INSERT INTO document_verification_logs 
-         (LRN, document_type, action, verified_by, verified_at) 
-         VALUES (?, ?, 'verified', ?, NOW())`,
-        [LRN, documentType, verifiedBy || 'system']
-      );
-    } catch (logError) {
-      console.error('Failed to log verification:', logError);
-      // Continue even if logging fails
-    }
-
     res.json({
       success: true,
       message: `Document ${documentType} verified successfully`,
@@ -233,3 +220,4 @@ router.get('/student/:LRN', async (req, res) => {
 });
 
 export default router;
+
