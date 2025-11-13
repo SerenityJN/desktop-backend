@@ -1,7 +1,7 @@
 import express from "express";
 import pool from "../models/db.js";
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import { verifyAdmin } from "../middleware/auth.js"; // ✅ renamed
 
@@ -65,3 +65,4 @@ router.get("/dashboard", verifyAdmin, (req, res) => {
 });
 
 export default router;
+
