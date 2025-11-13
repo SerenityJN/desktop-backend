@@ -44,7 +44,8 @@ async function createWindow() {
   });
 
   // You can also use `path.join` if you plan to load a local file later
-  mainWindow.loadURL("http://localhost:8000/index.html");
+  mainWindow.loadFile(path.join(__dirname, 'build', 'index.html'));
+  mainWindow.webContents.openDevTools();
 }
 
 app.whenReady().then(createWindow);
@@ -57,3 +58,4 @@ app.on("window-all-closed", () => {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
+
