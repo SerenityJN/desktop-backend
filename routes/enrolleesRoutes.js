@@ -129,17 +129,24 @@ router.post("/students/approve", async (req, res) => {
     const currentYear = new Date().getFullYear();
     const currentSchoolYear = `${currentYear}-${currentYear + 1}`;
     
-    // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both cases
+    // Update student_enrollments table
     const [updateResult] = await db.query(`
-    UPDATE student_enrollments 
-    SET semester = '2nd', 
-        status = 'Enrolled',
-        enrollment_type = 'Regular',
-        rejection_reason = NULL
-    WHERE LRN = ? AND school_year = ?
-  `, [LRN, currentSchoolYear]);
+      UPDATE student_enrollments 
+      SET semester = '2nd', 
+          status = 'Enrolled',
+          enrollment_type = 'Regular',
+          rejection_reason = NULL
+      WHERE LRN = ? AND school_year = ?
+    `, [LRN, currentSchoolYear]);
     
-    console.log('Database operation result:', result);
+    console.log('Database operation result:', updateResult);
+    
+    // Check if any rows were updated
+    if (updateResult.affectedRows === 0) {
+      return res.status(404).json({ 
+        error: "No enrollment record found for this student and school year" 
+      });
+    }
     
     // Update student_details table
     await db.query(
@@ -147,15 +154,17 @@ router.post("/students/approve", async (req, res) => {
       ['Enrolled', LRN]
     );
     
-    // Get student data for password generation
+    // Get student data
     const [studentData] = await db.query(
       'SELECT firstname, lastname FROM student_details WHERE LRN = ?',
       [LRN]
     );
     
+    const student = studentData[0];
+    
     res.json({
       success: true,
-      message: "Student approved for 2nd semester",
+      message: `Student ${student.firstname} ${student.lastname} approved for 2nd semester`,
       enrollment_status: 'Enrolled'
     });
     
@@ -576,6 +585,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
