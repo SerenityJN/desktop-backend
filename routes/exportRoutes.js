@@ -47,8 +47,9 @@ router.get('/student-data', async (req, res) => {
       FROM student_details sd
       LEFT JOIN student_enrollments se ON sd.LRN = se.LRN
       LEFT JOIN guardians g ON sd.LRN = g.LRN
-      WHERE sd.is_active = true
-      ORDER BY sd.lastname, sd.firstname
+      WHERE sd.is_active = true 
+      AND (sd.enrollment_status = 'Enrolled' OR sd.enrollment_status = 'Temporary Enrolled')
+      ORDER BY sd.enrollment_status, sd.lastname, sd.firstname
     `;
 
     const [results] = await db.execute(query);
@@ -59,5 +60,6 @@ router.get('/student-data', async (req, res) => {
     res.status(500).json({ error: 'Failed to export data' });
   }
 });
+
 
 export default router;
