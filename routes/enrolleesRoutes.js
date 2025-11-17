@@ -122,10 +122,15 @@ router.post("/students/approve", async (req, res) => {
   try {
     const { LRN } = req.body;
     
-    // Get current school year (you might want to make this dynamic)
-    const currentSchoolYear = '2025-2026';
+    if (!LRN) {
+      return res.status(400).json({ error: "LRN is required" });
+    }
     
-    // Get student details for password generation
+    // Get current school year dynamically
+    const currentYear = new Date().getFullYear();
+    const currentSchoolYear = `${currentYear}-${currentYear + 1}`;
+    
+    // Get student details
     const [studentData] = await db.query(
       'SELECT firstname, lastname FROM student_details WHERE LRN = ?',
       [LRN]
@@ -137,20 +142,41 @@ router.post("/students/approve", async (req, res) => {
     
     const student = studentData[0];
   
+    // Update enrollment record
     const [result] = await db.query(`
       UPDATE student_enrollments 
       SET semester = '2nd', 
           status = 'Enrolled',
           rejection_reason = NULL,
-          enrollment_type = 'Regular'
-      WHERE LRN = ? AND school_year = ? AND semester = '1st'
+          enrollment_type = 'Regular',
+          updated_at = NOW()
+      WHERE LRN = ? AND school_year = ?
     `, [LRN, currentSchoolYear]);
     
-    // Update student status to Enrolled
+    if (result.affectedRows === 0) {
+      // If no enrollment record exists, create one
+      await db.query(`
+        INSERT INTO student_enrollments (LRN, school_year, semester, status, enrollment_type, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [LRN, currentSchoolYear, '2nd', 'Enrolled', 'Regular']);
+    }
+    
+    // Update student status
     await db.query(
       'UPDATE student_details SET enrollment_status = ? WHERE LRN = ?',
       ['Enrolled', LRN]
     );
+    
+    // Generate password
+    const lastName = student.lastname.trim();
+    const lastFourOfLRN = LRN.slice(-4);
+    const plainTextPassword = `SV8B-${lastName}${lastFourOfLRN}`;
+    
+    res.json({
+      success: true,
+      message: `Student approved for 2nd semester`,
+      password: plainTextPassword
+    });
     
   } catch (err) {
     console.error("Error approving student:", err);
@@ -569,4 +595,5 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
