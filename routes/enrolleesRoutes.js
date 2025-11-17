@@ -130,16 +130,14 @@ router.post("/students/approve", async (req, res) => {
     const currentSchoolYear = `${currentYear}-${currentYear + 1}`;
     
     // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both cases
-    const [result] = await db.query(`
-      INSERT INTO student_enrollments 
-        (LRN, school_year, semester, status, enrollment_type, created_at)
-      VALUES (?, ?, '2nd', 'Enrolled', 'Regular', NOW())
-      ON DUPLICATE KEY UPDATE
-        semester = '2nd',
+    const [updateResult] = await db.query(`
+    UPDATE student_enrollments 
+    SET semester = '2nd', 
         status = 'Enrolled',
         enrollment_type = 'Regular',
         rejection_reason = NULL
-    `, [LRN, currentSchoolYear]);
+    WHERE LRN = ? AND school_year = ?
+  `, [LRN, currentSchoolYear]);
     
     console.log('Database operation result:', result);
     
@@ -578,6 +576,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
