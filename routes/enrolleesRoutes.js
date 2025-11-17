@@ -126,54 +126,45 @@ router.post("/students/approve", async (req, res) => {
       return res.status(400).json({ error: "LRN is required" });
     }
     
-    // Get current school year dynamically
     const currentYear = new Date().getFullYear();
     const currentSchoolYear = `${currentYear}-${currentYear + 1}`;
     
-    // Get student details
-    const [studentData] = await db.query(
-      'SELECT firstname, lastname FROM student_details WHERE LRN = ?',
-      [LRN]
-    );
-    
-    if (studentData.length === 0) {
-      return res.status(404).json({ error: "Student not found" });
-    }
-    
-    const student = studentData[0];
-  
-    // Update enrollment record
+    // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both cases
     const [result] = await db.query(`
-      UPDATE student_enrollments 
-      SET semester = '2nd', 
-          status = 'Enrolled',
-          rejection_reason = NULL,
-          enrollment_type = 'Regular'
-      WHERE LRN = ? AND school_year = ?
+      INSERT INTO student_enrollments 
+        (LRN, school_year, semester, status, enrollment_type, created_at)
+      VALUES (?, ?, '2nd', 'Enrolled', 'Regular', NOW())
+      ON DUPLICATE KEY UPDATE
+        semester = '2nd',
+        status = 'Enrolled',
+        enrollment_type = 'Regular',
+        rejection_reason = NULL,
+        updated_at = NOW()
     `, [LRN, currentSchoolYear]);
     
-    if (result.affectedRows === 0) {
-      // If no enrollment record exists, create one
-      await db.query(`
-        INSERT INTO student_enrollments (LRN, school_year, semester, status, enrollment_type, created_at)
-        VALUES (?, ?, ?, ?, ?, NOW())
-      `, [LRN, currentSchoolYear, '2nd', 'Enrolled', 'Regular']);
-    }
+    console.log('Database operation result:', result);
     
-    // Update student status
+    // Update student_details table
     await db.query(
       'UPDATE student_details SET enrollment_status = ? WHERE LRN = ?',
       ['Enrolled', LRN]
     );
     
+    // Get student data for password generation
+    const [studentData] = await db.query(
+      'SELECT firstname, lastname FROM student_details WHERE LRN = ?',
+      [LRN]
+    );
+    
     res.json({
       success: true,
-      message: `Student approved for 2nd semester`,
+      message: "Student approved for 2nd semester",
+      enrollment_status: 'Enrolled'
     });
     
   } catch (err) {
     console.error("Error approving student:", err);
-    res.status(500).json({ error: "Failed to approve student" });
+    res.status(500).json({ error: "Failed to approve student: " + err.message });
   }
 });
 
@@ -588,6 +579,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
