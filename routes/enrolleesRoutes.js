@@ -142,7 +142,6 @@ router.post("/students/approve", async (req, res) => {
       SET semester = '2nd', 
           status = 'Enrolled',
           rejection_reason = NULL,
-          updated_at = NOW(),
           enrollment_type = 'Regular'
       WHERE LRN = ? AND school_year = ? AND semester = '1st'
     `, [LRN, currentSchoolYear]);
@@ -570,3 +569,4 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
