@@ -2,14 +2,12 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-
 import express from "express";
 import path from "path";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { fileURLToPath } from "url";
 
-// Import route files
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import enrolleesRoutes from "./routes/enrolleesRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
@@ -18,39 +16,44 @@ import strandRoutes from "./routes/strandRoutes.js"; // ✅ newly added
 import SecondSemester from "./routes/SecondSemesterRoutes.js";
 import FirstSemester from "./routes/FirstSemesterRoutes.js"
 import documentRoutes from "./routes/documentRoutes.js"
-
-// Configurations
+import exportRoutes from './routes/exportRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// For handling __dirname in ES Modules
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Middleware
+
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ Serve uploaded files
+
 const uploadsPath = path.join(__dirname, "../../Website/enrollment/backend/uploads");
 app.use("/uploads", express.static(uploadsPath));
 console.log("✅ Serving uploads from:", uploadsPath);
 
-// ✅ Register API routes first
+
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/enrollees", enrolleesRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/announcements", announcementsRoutes); // ✅ added announcement route
-app.use("/api/strands", strandRoutes); // ✅ added announcement route
-app.use("/api/SecondSemester", SecondSemester); // ✅ added announcement route
+app.use("/api/announcements", announcementsRoutes); 
+app.use("/api/strands", strandRoutes); 
+app.use("/api/SecondSemester", SecondSemester);
 app.use("/api/FirstSemester", FirstSemester)
 app.use('/api/documents', documentRoutes);
+app.use('/api/export', exportRoutes);
 
 
-// ✅ Start the server
+
+app.use(express.static(path.join(__dirname, "../frontend")));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/login.html"));
+});
+
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
-
