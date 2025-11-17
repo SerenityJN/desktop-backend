@@ -148,8 +148,7 @@ router.post("/students/approve", async (req, res) => {
       SET semester = '2nd', 
           status = 'Enrolled',
           rejection_reason = NULL,
-          enrollment_type = 'Regular',
-          updated_at = NOW()
+          enrollment_type = 'Regular'
       WHERE LRN = ? AND school_year = ?
     `, [LRN, currentSchoolYear]);
     
@@ -167,15 +166,9 @@ router.post("/students/approve", async (req, res) => {
       ['Enrolled', LRN]
     );
     
-    // Generate password
-    const lastName = student.lastname.trim();
-    const lastFourOfLRN = LRN.slice(-4);
-    const plainTextPassword = `SV8B-${lastName}${lastFourOfLRN}`;
-    
     res.json({
       success: true,
       message: `Student approved for 2nd semester`,
-      password: plainTextPassword
     });
     
   } catch (err) {
@@ -595,5 +588,6 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
