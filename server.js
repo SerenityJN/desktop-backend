@@ -46,14 +46,7 @@ app.use("/api/FirstSemester", FirstSemester)
 app.use('/api/documents', documentRoutes);
 app.use('/api/export', exportRoutes);
 
-
-
-app.use(express.static(path.join(__dirname, "../frontend")));
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/login.html"));
-});
-
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
+
