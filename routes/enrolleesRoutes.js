@@ -139,7 +139,6 @@ router.post("/students/approve", async (req, res) => {
         status = 'Enrolled',
         enrollment_type = 'Regular',
         rejection_reason = NULL,
-        updated_at = NOW()
     `, [LRN, currentSchoolYear]);
     
     console.log('Database operation result:', result);
@@ -579,6 +578,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
