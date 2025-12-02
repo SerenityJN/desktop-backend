@@ -374,7 +374,7 @@ router.post("/update-status", async (req, res) => {
           <p style="margin-top:10px;">This code was also provided in your previous email.</p>
 
           <p style="text-align:center;margin:30px 0;">
-            <a href="https://expo.dev/artifacts/eas/n6nwRz1nQCeuyu2KBe2xUH.apk"
+            <a href="https://expo.dev/artifacts/eas/3KQaGvJumwTSH1kV8PWGtZ.apk"
               style="background-color:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">
               📱 Track Enrollment Status
             </a>
@@ -416,7 +416,7 @@ router.post("/update-status", async (req, res) => {
             </div>
             <p style="margin-top:25px;">You may now check your class schedule and important announcements through the app.</p>
             <p style="text-align:center;margin:30px 0;">
-              <a href="https://expo.dev/artifacts/eas/n6nwRz1nQCeuyu2KBe2xUH.apk"
+              <a href="https://expo.dev/artifacts/eas/3KQaGvJumwTSH1kV8PWGtZ.apk"
                 style="background-color:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">
                 📱 Open Student App
               </a>
@@ -483,7 +483,7 @@ router.post("/update-status", async (req, res) => {
             </div>
 
             <p style="text-align:center;margin:30px 0;">
-              <a href="https://expo.dev/artifacts/eas/n6nwRz1nQCeuyu2KBe2xUH.apk"
+              <a href="https://expo.dev/artifacts/eas/3KQaGvJumwTSH1kV8PWGtZ.apk"
                 style="background-color:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;display:inline-block;">
                 📱 Download Student App
               </a>
@@ -585,6 +585,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
