@@ -9,6 +9,7 @@ dotenv.config();
 const router = express.Router();
 
 // ✅ LOGIN ROUTE (with bcrypt + JWT)
+// ✅ LOGIN ROUTE (with last login update)
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -30,6 +31,12 @@ router.post("/login", async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
+
+    // ✅ UPDATE LAST LOGIN TIMESTAMP
+    await pool.query(
+      "UPDATE admin_accounts SET last_login = NOW() WHERE id = ?",
+      [admin.id]
+    );
 
     // Create JWT token WITH ROLE
     const token = jwt.sign(
@@ -84,6 +91,7 @@ router.get("/accounts", verifyAdmin, verifySuperAdmin, async (req, res) => {
         role, 
         full_name, 
         status, 
+        phone, 
         DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at
       FROM admin_accounts 
       ORDER BY created_at DESC
@@ -106,6 +114,7 @@ router.get("/accounts/:id", verifyAdmin, verifySuperAdmin, async (req, res) => {
         role, 
         full_name, 
         status, 
+        phone, 
         DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at
        FROM admin_accounts 
        WHERE id = ?`,
@@ -131,6 +140,7 @@ router.post("/accounts", verifyAdmin, verifySuperAdmin, async (req, res) => {
     confirm_password, 
     role, 
     full_name, 
+    phone, 
     status = 'active' 
   } = req.body;
   
@@ -167,9 +177,9 @@ router.post("/accounts", verifyAdmin, verifySuperAdmin, async (req, res) => {
     // Insert new admin
     const [result] = await pool.query(
       `INSERT INTO admin_accounts 
-        (email, password, role, full_name, status, created_at) 
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [email, hashedPassword, role, full_name || null, status] // 5 values for 5 parameters (6th is NOW())
+        (email, password, role, full_name, phone, status, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [email, hashedPassword, role, full_name || null, phone || null, status]
     );
     
     res.status(201).json({
@@ -185,7 +195,7 @@ router.post("/accounts", verifyAdmin, verifySuperAdmin, async (req, res) => {
 
 // ✅ UPDATE ADMIN ACCOUNT
 router.put("/accounts/:id", verifyAdmin, verifySuperAdmin, async (req, res) => {
-  const { email, role, full_name, status } = req.body;
+  const { email, role, full_name, phone, status } = req.body;
   const adminId = req.params.id;
   
   try {
@@ -228,6 +238,11 @@ router.put("/accounts/:id", verifyAdmin, verifySuperAdmin, async (req, res) => {
     if (full_name !== undefined) {
       updates.push("full_name = ?");
       values.push(full_name || null);
+    }
+    
+    if (phone !== undefined) {
+      updates.push("phone = ?");
+      values.push(phone || null);
     }
     
     if (status) {
@@ -349,6 +364,30 @@ router.delete("/accounts/:id", verifyAdmin, verifySuperAdmin, async (req, res) =
   }
 });
 
+// ✅ GET RECENTLY ACTIVE ADMINS
+router.get("/accounts/recent", verifyAdmin, async (req, res) => {
+  try {
+    const [admins] = await pool.query(`
+      SELECT 
+        id, 
+        email, 
+        full_name, 
+        role,
+        last_login,
+        TIMESTAMPDIFF(MINUTE, last_login, NOW()) as minutes_ago
+      FROM admin_accounts 
+      WHERE last_login IS NOT NULL
+      ORDER BY last_login DESC
+      LIMIT 5
+    `);
+    
+    res.json(admins);
+  } catch (error) {
+    console.error("Error fetching recent logins:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // ✅ GET ADMIN STATISTICS (for dashboard)
 router.get("/accounts/stats", verifyAdmin, async (req, res) => {
   try {
@@ -369,7 +408,4 @@ router.get("/accounts/stats", verifyAdmin, async (req, res) => {
   }
 });
 
-
 export default router;
-
-
