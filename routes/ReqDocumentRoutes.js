@@ -50,21 +50,28 @@ function drawLine(doc, y) {
     doc.moveTo(50, y).lineTo(550, y).stroke();
 }
 
-router.get('/enrolled-list', verifyAdmin, async (req, res) => {
+router.get('/list', verifyAdmin, async (req, res) => {
     try {
         const [students] = await db.query(
             `SELECT 
-                sd.LRN, sd.firstname, sd.lastname, sd.strand, se.year_level
+                sd.LRN, 
+                sd.firstname, 
+                sd.lastname, 
+                sd.strand,
+                sd.enrollment_status,
+                se.year_level,
+                se.school_year,
+                se.semester
              FROM student_details sd
-             JOIN student_enrollments se ON sd.LRN = se.LRN
-             WHERE se.status = 'enrolled'
+             LEFT JOIN student_enrollments se ON sd.LRN = se.LRN
+             WHERE sd.enrollment_status IN ('Enrolled', 'Temporary Enrolled')
              GROUP BY sd.LRN
              ORDER BY sd.lastname ASC`
         );
         res.json(students);
     } catch (error) {
-        console.error('Error fetching list:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error fetching enrolled students:', error);
+        res.status(500).json({ message: 'Server error fetching students' });
     }
 });
 
@@ -294,3 +301,4 @@ router.get('/generate/diploma/:lrn', verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
