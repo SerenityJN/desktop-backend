@@ -1,6 +1,6 @@
 import express from 'express';
 import PDFDocument from 'pdfkit';
-import { db } from '../models/db.js';
+import db from "../models/db.js";
 import { verifyAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -610,5 +610,6 @@ router.get('/generate/transcript/:lrn', verifyAdmin, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+
 
 export default router;
