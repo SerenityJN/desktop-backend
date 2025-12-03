@@ -168,7 +168,7 @@ router.post("/accounts", verifyAdmin, verifySuperAdmin, async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO admin_accounts 
         (email, password, role, full_name, status, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, ?, NOW())`,
       [email, hashedPassword, role, full_name || null  || null, status]
     );
     
@@ -371,3 +371,4 @@ router.get("/accounts/stats", verifyAdmin, async (req, res) => {
 
 
 export default router;
+
