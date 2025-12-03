@@ -3,15 +3,27 @@
   "version": "1.0.0",
   "description": "",
   "main": "main.js",
-  "scripts": {
-    "start": "node server.js"
-  },
   "type": "module",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@electron-forge/cli": "^7.10.2",
+    "@electron-forge/maker-deb": "^7.10.2",
+    "@electron-forge/maker-rpm": "^7.10.2",
+    "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-zip": "^7.10.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
+    "@electron-forge/plugin-fuses": "^7.10.2",
+    "@electron/fuses": "^1.8.0",
+    "concurrently": "^9.2.1",
+    "electron": "^38.6.0",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",
@@ -32,7 +44,6 @@
     "at-least-node": "^1.0.0",
     "balanced-match": "^1.0.2",
     "base64-js": "^1.5.1",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "bl": "^4.1.0",
     "body-parser": "^2.2.0",
@@ -87,7 +98,7 @@
     "ejs": "^3.1.10",
     "electron-builder-squirrel-windows": "^26.0.12",
     "electron-publish": "^26.0.11",
-    "electron-winstaller": "^5.4.0",
+    "electron-squirrel-startup": "^1.0.1",
     "emoji-regex": "^8.0.0",
     "encoding": "^0.1.13",
     "end-of-stream": "^1.4.5",
@@ -203,6 +214,7 @@
     "path-is-absolute": "^1.0.1",
     "path-key": "^3.1.1",
     "path-scurry": "^1.11.1",
+    "pdfkit": "^0.17.2",
     "pe-library": "^0.4.1",
     "pend": "^1.2.0",
     "picocolors": "^1.1.1",
@@ -280,5 +292,43 @@
     "yargs-parser": "^21.1.1",
     "yauzl": "^2.10.0",
     "yocto-queue": "^0.1.0"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {
+        "name": "EnrollmentSystem",
+        "executableName": "enrollment-system"
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "platform": "win32",
+          "config": {
+            "name": "EnrollmentSystem",
+            "authors": "Southville 8B Senior High School",
+            "description": "An Enrollment Management System for SVSHS",
+            "setupExe": "EnrollmentSystemInstaller.exe"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "win32"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "platforms": [
+            "linux"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "platforms": [
+            "linux"
+          ]
+        }
+      ]
+    }
   }
 }
