@@ -22,20 +22,16 @@ import RequestDocuments from './routes/ReqDocumentRoutes.js';
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-
 const uploadsPath = path.join(__dirname, "../../Website/enrollment/backend/uploads");
 app.use("/uploads", express.static(uploadsPath));
 console.log("✅ Serving uploads from:", uploadsPath);
-
 
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/enrollees", enrolleesRoutes);
@@ -48,14 +44,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/request', RequestDocuments);
 
-
-
-app.use(express.static(path.join(__dirname, "../frontend")));
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/login.html"));
-});
-
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
+
