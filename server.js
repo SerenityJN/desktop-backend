@@ -11,12 +11,13 @@ import { fileURLToPath } from "url";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import enrolleesRoutes from "./routes/enrolleesRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-import announcementsRoutes from "./routes/announcementRoutes.js"; // ✅ newly added
-import strandRoutes from "./routes/strandRoutes.js"; // ✅ newly added
+import announcementsRoutes from "./routes/announcementRoutes.js";
+import strandRoutes from "./routes/strandRoutes.js";
 import SecondSemester from "./routes/SecondSemesterRoutes.js";
 import FirstSemester from "./routes/FirstSemesterRoutes.js"
 import documentRoutes from "./routes/documentRoutes.js"
 import exportRoutes from './routes/exportRoutes.js';
+import RequestDocuments from './routes/ReqDocumentRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -45,8 +46,16 @@ app.use("/api/SecondSemester", SecondSemester);
 app.use("/api/FirstSemester", FirstSemester)
 app.use('/api/documents', documentRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/request', RequestDocuments);
+
+
+
+app.use(express.static(path.join(__dirname, "../frontend")));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/login.html"));
+});
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
-
