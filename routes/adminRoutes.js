@@ -9,7 +9,6 @@ dotenv.config();
 const router = express.Router();
 
 // ✅ LOGIN ROUTE (with bcrypt + JWT)
-// ✅ LOGIN ROUTE (with last login update)
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -31,12 +30,6 @@ router.post("/login", async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-
-    // ✅ UPDATE LAST LOGIN TIMESTAMP
-    await pool.query(
-      "UPDATE admin_accounts SET last_login = NOW() WHERE id = ?",
-      [admin.id]
-    );
 
     // Create JWT token WITH ROLE
     const token = jwt.sign(
@@ -364,29 +357,6 @@ router.delete("/accounts/:id", verifyAdmin, verifySuperAdmin, async (req, res) =
   }
 });
 
-// ✅ GET RECENTLY ACTIVE ADMINS
-router.get("/accounts/recent", verifyAdmin, async (req, res) => {
-  try {
-    const [admins] = await pool.query(`
-      SELECT 
-        id, 
-        email, 
-        full_name, 
-        role,
-        last_login,
-        TIMESTAMPDIFF(MINUTE, last_login, NOW()) as minutes_ago
-      FROM admin_accounts 
-      WHERE last_login IS NOT NULL
-      ORDER BY last_login DESC
-      LIMIT 5
-    `);
-    
-    res.json(admins);
-  } catch (error) {
-    console.error("Error fetching recent logins:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
 
 // ✅ GET ADMIN STATISTICS (for dashboard)
 router.get("/accounts/stats", verifyAdmin, async (req, res) => {
