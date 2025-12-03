@@ -357,7 +357,6 @@ router.delete("/accounts/:id", verifyAdmin, verifySuperAdmin, async (req, res) =
   }
 });
 
-
 // ✅ GET ADMIN STATISTICS (for dashboard)
 router.get("/accounts/stats", verifyAdmin, async (req, res) => {
   try {
