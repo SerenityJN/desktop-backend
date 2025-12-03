@@ -169,7 +169,7 @@ router.post("/accounts", verifyAdmin, verifySuperAdmin, async (req, res) => {
       `INSERT INTO admin_accounts 
         (email, password, role, full_name, status, created_at) 
        VALUES (?, ?, ?, ?, ?, NOW())`,
-      [email, hashedPassword, role, full_name || null  || null, status]
+      [email, hashedPassword, role, full_name || null, status] // 5 values for 5 parameters (6th is NOW())
     );
     
     res.status(201).json({
@@ -371,4 +371,5 @@ router.get("/accounts/stats", verifyAdmin, async (req, res) => {
 
 
 export default router;
+
 
