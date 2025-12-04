@@ -2,8 +2,37 @@ import express from 'express';
 import PDFDocument from 'pdfkit';
 import db from "../models/db.js";
 import { verifyAdmin } from '../middleware/auth.js';
+import fs from 'fs';
+import path from 'path';
 
 const router = express.Router();
+
+// Helper function to draw logos (you'll need to add your actual logo files)
+async function drawLogo(doc, side, yPosition) {
+    try {
+        const logoPath = path.join(process.cwd(), 'public', 'images', 'logo.png');
+        if (fs.existsSync(logoPath)) {
+            if (side === 'left') {
+                doc.image(logoPath, 50, yPosition, { width: 60, height: 60 });
+            } else {
+                doc.image(logoPath, doc.page.width - 110, yPosition, { width: 60, height: 60 });
+            }
+        } else {
+            // Fallback: Draw a simple logo placeholder
+            if (side === 'left') {
+                doc.rect(50, yPosition, 60, 60).stroke();
+                doc.fontSize(8).text('SCHOOL', 55, yPosition + 20, { width: 50, align: 'center' });
+                doc.text('LOGO', 55, yPosition + 35, { width: 50, align: 'center' });
+            } else {
+                doc.rect(doc.page.width - 110, yPosition, 60, 60).stroke();
+                doc.fontSize(8).text('SCHOOL', doc.page.width - 105, yPosition + 20, { width: 50, align: 'center' });
+                doc.text('LOGO', doc.page.width - 105, yPosition + 35, { width: 50, align: 'center' });
+            }
+        }
+    } catch (error) {
+        console.error('Error drawing logo:', error);
+    }
+}
 
 async function getStudentData(LRN) {
     try {
@@ -46,32 +75,99 @@ function formatDate(date) {
     });
 }
 
-function drawLine(doc, y) {
-    doc.moveTo(50, y).lineTo(550, y).stroke();
+function drawFormalHeader(doc, title, subtitle = null) {
+    // Draw logos on both sides
+    const logoY = 50;
+    drawLogo(doc, 'left', logoY);
+    drawLogo(doc, 'right', logoY);
+    
+    // Department header
+    doc.font('Helvetica-Bold').fontSize(11)
+       .text('Republic of the Philippines', { align: 'center' })
+       .moveDown(0.3);
+    
+    doc.font('Helvetica-Bold').fontSize(12)
+       .text('Department of Education', { align: 'center' })
+       .moveDown(0.5);
+    
+    // Region header
+    doc.font('Helvetica').fontSize(10)
+       .text('Region IV-A CALABARZON', { align: 'center' })
+       .moveDown(0.5);
+    
+    doc.font('Helvetica-Bold').fontSize(10)
+       .text('SCHOOLS DIVISION OF RIZAL', { align: 'center' })
+       .moveDown(1);
+    
+    // School name with emphasis
+    doc.font('Helvetica-Bold').fontSize(20)
+       .text('SOUTHVILLE 8B SENIOR HIGH SCHOOL', { align: 'center' })
+       .moveDown(0.5);
+    
+    doc.font('Helvetica').fontSize(10)
+       .text('San Isidro, Rodriguez, Rizal', { align: 'center' })
+       .moveDown(0.3);
+    
+    doc.font('Helvetica').fontSize(9)
+       .text('Email: 342567@deped.gov.ph • Tel: (02) 85511982', { align: 'center' })
+       .moveDown(2);
+    
+    // Main title
+    doc.font('Helvetica-Bold').fontSize(18)
+       .text(title, { align: 'center' });
+    
+    if (subtitle) {
+        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(12)
+           .text(subtitle, { align: 'center' });
+    }
+    
+    // Decorative line
+    const y = doc.y + 5;
+    doc.moveTo(50, y).lineTo(doc.page.width - 50, y).lineWidth(1).stroke();
+    doc.moveDown(2);
 }
 
-router.get('/list', verifyAdmin, async (req, res) => {
+function addSignatureSection(doc, name, title, align = 'left', offsetX = 0) {
+    const signatureY = doc.y + 20;
+    
+    // Signature line
+    doc.moveTo(offsetX + 100, signatureY + 15)
+       .lineTo(offsetX + 250, signatureY + 15)
+       .stroke();
+    
+    // Name
+    doc.font('Helvetica-Bold').fontSize(11)
+       .text(name, offsetX + 100, signatureY + 20, { 
+           width: 150, 
+           align: 'center' 
+       });
+    
+    // Title
+    doc.font('Helvetica').fontSize(10)
+       .text(title, offsetX + 100, signatureY + 35, { 
+           width: 150, 
+           align: 'center' 
+       });
+}
+
+router.get('/
+           
+           list', verifyAdmin, async (req, res) => {
     try {
         const [students] = await db.query(
             `SELECT 
-                sd.LRN, 
-                sd.firstname, 
-                sd.lastname, 
-                sd.strand,
-                sd.enrollment_status,
-                se.year_level,
-                se.school_year,
-                se.semester
+                sd.LRN, sd.firstname, sd.lastname, sd.strand, se.year_level
              FROM student_details sd
-             LEFT JOIN student_enrollments se ON sd.LRN = se.LRN
-             WHERE sd.enrollment_status IN ('Enrolled', 'Temporary Enrolled')
+             JOIN student_enrollments se ON sd.LRN = se.LRN
+             WHERE se.status = 'enrolled'
              GROUP BY sd.LRN
              ORDER BY sd.lastname ASC`
         );
         res.json(students);
     } catch (error) {
-        console.error('Error fetching enrolled students:', error);
-        res.status(500).json({ message: 'Server error fetching students' });
+        console.error('Error fetching list:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
@@ -101,38 +197,77 @@ router.get('/generate/enrollment/:lrn', verifyAdmin, async (req, res) => {
         const student = await getStudentData(req.params.lrn);
         if (!student) return res.status(404).json({ message: 'Student not found' });
 
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ 
+            margin: 50,
+            size: 'A4',
+            info: {
+                Title: 'Certificate of Enrollment',
+                Author: 'Southville 8B Senior High School',
+                Subject: 'Student Enrollment Certificate'
+            }
+        });
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="COE_${student.LRN}.pdf"`);
         doc.pipe(res);
         
-        doc.font('Helvetica-Bold').fontSize(12).text('Republic of the Philippines', { align: 'center' });
-        doc.text('Department of Education', { align: 'center' });
-        doc.fontSize(16).text('SOUTHVILLE 8B SENIOR HIGH SCHOOL', { align: 'center' });
-        doc.fontSize(10).font('Helvetica').text('San Isidro, Rodriguez, Rizal', { align: 'center' });
-        doc.moveDown(3);
+        // Formal header with logos
+        drawFormalHeader(doc, 'CERTIFICATE OF ENROLLMENT');
         
-        doc.font('Helvetica-Bold').fontSize(24).text('CERTIFICATE OF ENROLLMENT', { align: 'center' });
-        doc.moveDown(2);
+        // Reference number
+        doc.font('Helvetica').fontSize(10)
+           .text(`Reference No.: COE-${student.LRN}-${new Date().getFullYear()}`, { align: 'right' })
+           .moveDown();
         
-        doc.font('Helvetica').fontSize(12).text('TO WHOM IT MAY CONCERN:', { align: 'left' });
-        doc.moveDown();
+        const currentDate = formatDate(new Date());
+        doc.font('Helvetica').fontSize(11)
+           .text(`Date: ${currentDate}`, { align: 'right' })
+           .moveDown(2);
         
-        const fullName = `${student.firstname} ${student.middlename || ''} ${student.lastname} ${student.suffix || ''}`.toUpperCase();
+        // Address block
+        doc.text('TO WHOM IT MAY CONCERN:', { align: 'left' })
+           .moveDown();
+        
+        // Formal body text
+        const fullName = `${student.lastname}, ${student.firstname} ${student.middlename || ''} ${student.suffix || ''}`.toUpperCase();
         const sy = student.school_year || new Date().getFullYear() + '-' + (new Date().getFullYear()+1);
+        const strand = student.enrolled_strand || student.strand || 'Not Specified';
+        const yearLevel = student.enrolled_year_level || 'Grade 11';
         
-        doc.text(`This is to certify that ${fullName}, with Learner Reference Number (LRN) ${student.LRN}, is officially enrolled in ${student.enrolled_year_level || 'Grade 11'}, under the ${student.enrolled_strand || student.strand} strand for the School Year ${sy}.`, { align: 'justify', indent: 50, lineGap: 5 });
-        doc.moveDown();
+        doc.font('Helvetica').fontSize(12)
+           .text(`This is to certify that ${fullName}, bearing Learner Reference Number (LRN) ${student.LRN}, is a bona fide student of Southville 8B Senior High School, located at San Isidro, Rodriguez, Rizal.`, 
+           { align: 'justify', indent: 30, lineGap: 5 })
+           .moveDown();
         
-        doc.text('This certification is issued upon the request of the above-named student for whatever legal purpose it may serve.', { align: 'justify', indent: 50, lineGap: 5 });
-        doc.moveDown(2);
+        doc.text(`The aforementioned student is currently enrolled as a ${yearLevel} student under the ${strand} strand for the School Year ${sy}.`, 
+           { align: 'justify', indent: 30, lineGap: 5 })
+           .moveDown();
         
-        doc.text(`Given this ${formatDate(new Date())} at Rodriguez, Rizal.`, { indent: 50 });
+        doc.text(`This certification is issued upon the request of ${student.firstname} ${student.lastname} for whatever legal purpose it may serve, particularly for ${student.enrollment_type === 'transfer' ? 'transfer purposes' : 'scholarship application'}.`, 
+           { align: 'justify', indent: 30, lineGap: 5 })
+           .moveDown(2);
+        
+        doc.text(`Issued this ${formatDate(new Date())} at the office of the School Registrar, Southville 8B Senior High School, Rodriguez, Rizal.`, 
+           { indent: 30 })
+           .moveDown(4);
+        
+        // Signature section
+        addSignatureSection(doc, 'DARYL F. BALBINO', 'School Registrar', 'right', 250);
+        
+        // Official stamp text
         doc.moveDown(4);
+        doc.font('Helvetica-Oblique').fontSize(9)
+           .text('Official Document • Not Valid Without School Seal', { align: 'center' });
         
-        doc.font('Helvetica-Bold').text('SCHOOL REGISTRAR', { align: 'right' });
-        doc.font('Helvetica').fontSize(10).text('Registrar II', { align: 'right' });
-
+        // Footer
+        doc.moveTo(50, doc.page.height - 50)
+           .lineTo(doc.page.width - 50, doc.page.height - 50)
+           .stroke();
+        
+        doc.font('Helvetica').fontSize(8)
+           .text('Southville 8B Senior High School • San Isidro, Rodriguez, Rizal • (02) 85511982', 
+           50, doc.page.height - 40, { width: doc.page.width - 100, align: 'center' });
+        
         doc.end();
     } catch (error) {
         console.error(error);
@@ -145,36 +280,100 @@ router.get('/generate/good_moral/:lrn', verifyAdmin, async (req, res) => {
         const student = await getStudentData(req.params.lrn);
         if (!student) return res.status(404).json({ message: 'Student not found' });
 
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ 
+            margin: 50,
+            size: 'A4',
+            info: {
+                Title: 'Certificate of Good Moral Character',
+                Author: 'Southville 8B Senior High School',
+                Subject: 'Student Character Certificate'
+            }
+        });
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="GoodMoral_${student.LRN}.pdf"`);
         doc.pipe(res);
         
-        doc.font('Helvetica-Bold').fontSize(16).text('SOUTHVILLE 8B SENIOR HIGH SCHOOL', { align: 'center' });
-        doc.fontSize(10).font('Helvetica').text('San Isidro, Rodriguez, Rizal', { align: 'center' });
-        doc.moveDown(3);
+        // Formal header
+        drawFormalHeader(doc, 'CERTIFICATE OF GOOD MORAL CHARACTER');
         
-        doc.font('Helvetica-Bold').fontSize(20).text('CERTIFICATE OF GOOD MORAL CHARACTER', { align: 'center', underline: true });
-        doc.moveDown(3);
+        // Reference number
+        doc.font('Helvetica').fontSize(10)
+           .text(`Ref. No.: GM-${student.LRN}-${new Date().getFullYear()}`, { align: 'right' })
+           .moveDown();
         
-        const fullName = `${student.firstname} ${student.lastname}`.toUpperCase();
+        // Address block
+        doc.text('TO WHOM IT MAY CONCERN:', { align: 'left' })
+           .moveDown();
+        
+        // Formal body text
+        const fullName = `${student.firstname} ${student.middlename || ''} ${student.lastname}`.toUpperCase();
+        const gender = student.sex?.toLowerCase() === 'male' ? 'He' : 'She';
+        const gender2 = student.sex?.toLowerCase() === 'male' ? 'his' : 'her';
         
         doc.font('Helvetica').fontSize(12)
-           .text(`This is to certify that ${fullName} is a bona fide student of this institution.`, { align: 'justify', indent: 50, lineGap: 6 })
+           .text(`This is to certify that ${fullName}, bearing Learner Reference Number ${student.LRN}, is a bona fide student of Southville 8B Senior High School.`, 
+           { align: 'justify', indent: 30, lineGap: 6 })
            .moveDown();
-           
-        doc.text(`He/She is a person of good moral character and has not been subjected to any disciplinary action during his/her stay in this school.`, { align: 'justify', indent: 50, lineGap: 6 })
-           .moveDown();
-           
-        doc.text(`Issued this ${formatDate(new Date())} for whatever legal purpose it may serve.`, { indent: 50 });
-        doc.moveDown(4);
         
-        const y = doc.y;
-        doc.text('GUIDANCE COUNSELOR', 50, y);
-        doc.text('SCHOOL PRINCIPAL', 350, y, { align: 'right' });
-
+        doc.text(`${gender} is currently enrolled in ${student.enrolled_year_level || 'Grade 11'} under the ${student.enrolled_strand || student.strand || 'Not Specified'} strand for the School Year ${student.school_year || new Date().getFullYear() + '-' + (new Date().getFullYear()+1)}.`, 
+           { align: 'justify', indent: 30, lineGap: 6 })
+           .moveDown();
+        
+        doc.text(`Based on school records and as certified by the Guidance Office, ${fullName} has exhibited good moral character during ${gender2} entire stay in this institution. ${gender} has not been subjected to any disciplinary action and has consistently demonstrated proper conduct and behavior befitting a student of Southville 8B Senior High School.`, 
+           { align: 'justify', indent: 30, lineGap: 6 })
+           .moveDown();
+        
+        doc.text(`This certification is issued upon the request of ${student.firstname} ${student.lastname} for ${student.enrollment_type === 'college' ? 'college admission purposes' : 'whatever legal purpose it may serve'}.`, 
+           { align: 'justify', indent: 30, lineGap: 6 })
+           .moveDown(2);
+        
+        doc.text(`Issued this ${formatDate(new Date())} at Southville 8B Senior High School, Rodriguez, Rizal.`, 
+           { indent: 30 })
+           .moveDown(4);
+        
+        // Dual signatures
+        const signatureY = doc.y;
+        
+        // Guidance Counselor
+        doc.moveTo(100, signatureY + 15)
+           .lineTo(250, signatureY + 15)
+           .stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(11)
+           .text('JOPHYLYNE S. LUCENA', 100, signatureY + 20, { width: 150, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(10)
+           .text('Guidance Coordinator', 100, signatureY + 35, { width: 150, align: 'center' });
+        
+        // School Principal
+        doc.moveTo(350, signatureY + 15)
+           .lineTo(500, signatureY + 15)
+           .stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(11)
+           .text('ENGR. ROCHELLE Z. VALDULLA', 350, signatureY + 20, { width: 150, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(10)
+           .text('School Head', 350, signatureY + 35, { width: 150, align: 'center' });
+        
+        // Official stamp
+        doc.moveDown(4);
+        doc.font('Helvetica-Oblique').fontSize(9)
+           .text('• Official Document • Not Valid Without School Seal •', { align: 'center' });
+        
+        // Footer
+        doc.moveTo(50, doc.page.height - 50)
+           .lineTo(doc.page.width - 50, doc.page.height - 50)
+           .stroke();
+        
+        doc.font('Helvetica').fontSize(8)
+           .text('Certificate of Good Moral Character • Southville 8B SHS • Issued Electronically', 
+           50, doc.page.height - 40, { width: doc.page.width - 100, align: 'center' });
+        
         doc.end();
     } catch (error) {
+        console.error(error);
         res.status(500).send("Error generating document");
     }
 });
@@ -184,64 +383,166 @@ router.get('/generate/form137/:lrn', verifyAdmin, async (req, res) => {
         const student = await getStudentData(req.params.lrn);
         if (!student) return res.status(404).json({ message: 'Student not found' });
 
-        const doc = new PDFDocument({ margin: 30, size: 'Legal' });
+        const doc = new PDFDocument({ 
+            margin: 40, 
+            size: 'Legal',
+            info: {
+                Title: 'Form 137 - Permanent Record',
+                Author: 'Southville 8B Senior High School',
+                Subject: 'Student Academic Record'
+            }
+        });
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="SF10_${student.LRN}.pdf"`);
         doc.pipe(res);
         
-        doc.font('Helvetica-Bold').fontSize(10).text('Learner\'s Permanent Academic Record (SF10-SHS)', { align: 'center' });
-        doc.moveDown();
+        // Header with logos
+        const logoY = 40;
+        drawLogo(doc, 'left', logoY);
+        drawLogo(doc, 'right', logoY);
         
-        doc.rect(30, doc.y, 550, 80).stroke();
-        const startY = doc.y + 10;
+        doc.font('Helvetica-Bold').fontSize(11)
+           .text('Republic of the Philippines', 200, 45, { width: 200, align: 'center' })
+           .moveDown(0.3);
         
-        doc.font('Helvetica-Bold').fontSize(9);
-        doc.text(`Name: ${student.lastname}, ${student.firstname} ${student.middlename || ''}`, 40, startY);
-        doc.text(`LRN: ${student.LRN}`, 350, startY);
+        doc.font('Helvetica-Bold').fontSize(12)
+           .text('Department of Education', 200, 58, { width: 200, align: 'center' });
         
-        doc.text(`Date of Birth: ${formatDate(student.birthdate)}`, 40, startY + 15);
-        doc.text(`Sex: ${student.sex}`, 350, startY + 15);
+        doc.font('Helvetica-Bold').fontSize(14)
+           .text('LEARNER\'S PERMANENT ACADEMIC RECORD', 200, 75, { width: 200, align: 'center' });
         
-        doc.text(`Parent/Guardian: ${student.GuardianName || student.FathersName || student.MothersName}`, 40, startY + 30);
+        doc.font('Helvetica').fontSize(10)
+           .text('(Formerly Form 137)', 200, 92, { width: 200, align: 'center' });
         
-        doc.moveDown(4);
+        doc.font('Helvetica-Bold').fontSize(16)
+           .text('SOUTHVILLE 8B SENIOR HIGH SCHOOL', 200, 105, { width: 200, align: 'center' });
         
-        doc.font('Helvetica-Bold').fontSize(10).text('SCHOLASTIC RECORD', { align: 'center' });
-        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(9)
+           .text('San Isidro, Rodriguez, Rizal', 200, 122, { width: 200, align: 'center' });
         
-        const tableTop = doc.y;
-        doc.font('Helvetica-Bold').fontSize(9);
-        doc.text('Subject', 40, tableTop);
-        doc.text('Midterm', 300, tableTop);
-        doc.text('Finals', 360, tableTop);
-        doc.text('Action', 420, tableTop);
+        // Student Information Box
+        const infoBoxY = 150;
+        doc.rect(40, infoBoxY, 520, 100).stroke();
         
-        drawLine(doc, tableTop + 15);
+        doc.font('Helvetica-Bold').fontSize(12)
+           .text('LEARNER\'S INFORMATION', 45, infoBoxY - 10);
         
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text('Name:', 45, infoBoxY + 15);
+        doc.text('LRN:', 45, infoBoxY + 35);
+        doc.text('Date of Birth:', 45, infoBoxY + 55);
+        doc.text('Sex:', 300, infoBoxY + 55);
+        doc.text('Address:', 45, infoBoxY + 75);
+        
+        doc.font('Helvetica').fontSize(10);
+        const fullName = `${student.lastname}, ${student.firstname} ${student.middlename || ''}`.toUpperCase();
+        doc.text(fullName, 100, infoBoxY + 15);
+        doc.text(student.LRN, 100, infoBoxY + 35);
+        doc.text(formatDate(student.birthdate), 130, infoBoxY + 55);
+        doc.text(student.sex || 'Not Specified', 330, infoBoxY + 55);
+        doc.text(student.address || 'Not Provided', 110, infoBoxY + 75);
+        
+        // Scholastic Record Header
+        doc.font('Helvetica-Bold').fontSize(14)
+           .text('SENIOR HIGH SCHOOL SCHOLASTIC RECORD', 200, infoBoxY + 120, { width: 200, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(10)
+           .text(`School Year: ${student.school_year || new Date().getFullYear() + '-' + (new Date().getFullYear()+1)} • Semester: ${student.semester || 'First'}`, 
+           200, infoBoxY + 140, { width: 200, align: 'center' });
+        
+        // Table Header
+        const tableTop = infoBoxY + 160;
+        doc.rect(40, tableTop, 520, 20).fill('#f0f0f0').stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('black');
+        doc.text('SUBJECTS', 45, tableTop + 5);
+        doc.text('MIDTERM', 350, tableTop + 5, { width: 60, align: 'center' });
+        doc.text('FINALS', 410, tableTop + 5, { width: 60, align: 'center' });
+        doc.text('REMARKS', 470, tableTop + 5, { width: 80, align: 'center' });
+        
+        // Sample Data - In production, fetch from database
         const subjects = [
-            { name: 'Core: Oral Communication', mid: '88', fin: '90' },
-            { name: 'Core: Komunikasyon', mid: '85', fin: '87' },
-            { name: 'Core: General Mathematics', mid: '83', fin: '85' },
-            { name: 'Applied: Empowerment Tech', mid: '91', fin: '92' },
-            { name: 'Specialized: Pre-Calculus', mid: '80', fin: '82' }
+            { code: 'CORE 101', name: 'Oral Communication', midterm: '88', final: '90' },
+            { code: 'CORE 102', name: 'Komunikasyon sa Pananaliksik', midterm: '85', final: '87' },
+            { code: 'CORE 103', name: 'General Mathematics', midterm: '83', final: '85' },
+            { code: 'APPLIED 101', name: 'Empowerment Technologies', midterm: '91', final: '92' },
+            { code: 'SPEC 201', name: 'Pre-Calculus', midterm: '80', final: '82' },
+            { code: 'SPEC 202', name: 'Basic Calculus', midterm: '78', final: '80' },
         ];
         
-        let rowY = tableTop + 25;
-        doc.font('Helvetica').fontSize(9);
+        let currentY = tableTop + 25;
         
-        subjects.forEach(sub => {
-            doc.text(sub.name, 40, rowY);
-            doc.text(sub.mid, 300, rowY);
-            doc.text(sub.fin, 360, rowY);
-            doc.text('PASSED', 420, rowY);
-            rowY += 15;
+        subjects.forEach((subject, index) => {
+            // Alternating row colors
+            if (index % 2 === 0) {
+                doc.rect(40, currentY - 5, 520, 20).fill('#f9f9f9').stroke();
+            } else {
+                doc.rect(40, currentY - 5, 520, 20).fill('#ffffff').stroke();
+            }
+            
+            doc.font('Helvetica').fontSize(9).fillColor('black');
+            doc.text(`${subject.code}: ${subject.name}`, 45, currentY);
+            doc.text(subject.midterm, 350, currentY, { width: 60, align: 'center' });
+            doc.text(subject.final, 410, currentY, { width: 60, align: 'center' });
+            doc.text(parseInt(subject.final) >= 75 ? 'PASSED' : 'FAILED', 470, currentY, { width: 80, align: 'center' });
+            
+            currentY += 20;
         });
         
-        drawLine(doc, rowY);
+        // Bottom border
+        doc.rect(40, currentY - 5, 520, 1).fill('#000000').stroke();
+        
+        // Footer with signatures
+        doc.moveDown(2);
+        const signatureY = currentY + 20;
+        
+        // Class Adviser
+        doc.moveTo(60, signatureY + 15)
+           .lineTo(210, signatureY + 15)
+           .stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(10)
+           .text('JUANA DELA CRUZ', 60, signatureY + 20, { width: 150, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(9)
+           .text('Class Adviser', 60, signatureY + 32, { width: 150, align: 'center' });
+        
+        // School Registrar
+        doc.moveTo(230, signatureY + 15)
+           .lineTo(380, signatureY + 15)
+           .stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(10)
+           .text('MARIA SANTOS', 230, signatureY + 20, { width: 150, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(9)
+           .text('School Registrar II', 230, signatureY + 32, { width: 150, align: 'center' });
+        
+        // School Principal
+        doc.moveTo(400, signatureY + 15)
+           .lineTo(550, signatureY + 15)
+           .stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(10)
+           .text('DR. ROBERT GARCIA', 400, signatureY + 20, { width: 150, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(9)
+           .text('School Principal IV', 400, signatureY + 32, { width: 150, align: 'center' });
+        
+        // Official footer
+        doc.moveTo(40, doc.page.height - 50)
+           .lineTo(560, doc.page.height - 50)
+           .stroke();
+        
+        doc.font('Helvetica').fontSize(8)
+           .text('SF10 - Permanent Academic Record • Southville 8B Senior High School • CONFIDENTIAL', 
+           40, doc.page.height - 40, { width: 520, align: 'center' });
         
         doc.end();
     } catch (error) {
-        res.status(500).send("Error generating SF10");
+        console.error(error);
+        res.status(500).send("Error generating Form 137");
     }
 });
 
@@ -250,55 +551,156 @@ router.get('/generate/diploma/:lrn', verifyAdmin, async (req, res) => {
         const student = await getStudentData(req.params.lrn);
         if (!student) return res.status(404).json({ message: 'Student not found' });
 
-        const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 50 });
+        const doc = new PDFDocument({ 
+            layout: 'landscape', 
+            size: 'A4', 
+            margin: 50,
+            info: {
+                Title: 'Senior High School Diploma',
+                Author: 'Southville 8B Senior High School',
+                Subject: 'Graduation Diploma'
+            }
+        });
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="Diploma_${student.LRN}.pdf"`);
         doc.pipe(res);
         
-        doc.rect(20, 20, 800, 555).lineWidth(3).stroke();
-        doc.rect(25, 25, 790, 545).lineWidth(1).stroke();
+        // Decorative border
+        doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40)
+           .lineWidth(3)
+           .strokeColor('#1a237e')
+           .stroke();
+        
+        doc.rect(30, 30, doc.page.width - 60, doc.page.height - 60)
+           .lineWidth(1)
+           .strokeColor('#000000')
+           .stroke();
+        
+        // Header with logos
+        const logoY = 50;
+        drawLogo(doc, 'left', logoY);
+        drawLogo(doc, 'right', logoY);
+        
+        // Official header
+        doc.font('Helvetica-Bold').fontSize(14)
+           .text('Republic of the Philippines', { align: 'center' })
+           .moveDown(0.5);
+        
+        doc.font('Helvetica-Bold').fontSize(16)
+           .text('Department of Education', { align: 'center' })
+           .moveDown(1);
+        
+        doc.font('Helvetica').fontSize(12)
+           .text('Region IV-A CALABARZON', { align: 'center' })
+           .moveDown(0.5);
+        
+        doc.font('Helvetica-Bold').fontSize(14)
+           .text('Schools Division of Rizal', { align: 'center' })
+           .moveDown(2);
+        
+        // School name in elegant font
+        doc.font('Times-Bold').fontSize(28)
+           .text('SOUTHVILLE 8B SENIOR HIGH SCHOOL', { align: 'center' })
+           .moveDown(0.5);
+        
+        doc.font('Times-Roman').fontSize(12)
+           .text('San Isidro, Rodriguez, Rizal', { align: 'center' })
+           .moveDown(3);
+        
+        // Diploma title
+        doc.font('Times-Bold').fontSize(20)
+           .text('DIPLOMA', { align: 'center' })
+           .moveDown(2);
+        
+        // Body text
+        doc.font('Times-Roman').fontSize(14)
+           .text('This certifies that', { align: 'center' })
+           .moveDown(1);
+        
+        // Student name in elegant style
+        const fullName = `${student.firstname} ${student.middlename || ''} ${student.lastname} ${student.suffix || ''}`.toUpperCase();
+        doc.font('Helvetica-Bold').fontSize(32)
+           .text(fullName, { align: 'center' })
+           .moveDown(1);
+        
+        // Decorative underline
+        doc.moveTo(doc.page.width / 2 - 150, doc.y)
+           .lineTo(doc.page.width / 2 + 150, doc.y)
+           .lineWidth(2)
+           .strokeColor('#1a237e')
+           .stroke();
         
         doc.moveDown(2);
-        doc.font('Helvetica').fontSize(12).text('Republic of the Philippines', { align: 'center' });
-        doc.text('Department of Education', { align: 'center' });
-        doc.moveDown();
         
-        doc.font('Helvetica-Bold').fontSize(26).text('SOUTHVILLE 8B SENIOR HIGH SCHOOL', { align: 'center' });
-        doc.font('Helvetica').fontSize(14).text('Rodriguez, Rizal', { align: 'center' });
+        doc.font('Times-Roman').fontSize(14)
+           .text('has satisfactorily completed the prescribed Senior High School Curriculum', { align: 'center' })
+           .moveDown(0.5);
+        
+        doc.text('in accordance with the requirements of the Department of Education', { align: 'center' })
+           .moveDown(0.5);
+        
+        doc.font('Times-Bold').fontSize(15)
+           .text(`under the ${student.enrolled_strand || student.strand || 'Academic Track'} strand`, { align: 'center' })
+           .moveDown(2);
+        
+        doc.font('Times-Roman').fontSize(14)
+           .text('and is therefore awarded this', { align: 'center' })
+           .moveDown(1);
+        
+        doc.font('Times-Bold').fontSize(24)
+           .text('DIPLOMA', { align: 'center' })
+           .moveDown(2);
+        
+        // Date and location
+        doc.font('Times-Roman').fontSize(12)
+           .text(`Given this ${formatDate(new Date())} at Rodriguez, Rizal, Philippines.`, { align: 'center' })
+           .moveDown(4);
+        
+        // Official signatures
+        const signatureY = doc.y;
+        
+        // School Principal
+        doc.moveTo(100, signatureY + 15)
+           .lineTo(300, signatureY + 15)
+           .stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(12)
+           .text('ENGR. ROCHELLE Z. VALDULLA', 100, signatureY + 20, { width: 200, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(10)
+           .text('School Head', 100, signatureY + 35, { width: 200, align: 'center' });
+        
+        // Schools Division Superintendent
+        doc.moveTo(350, signatureY + 15)
+           .lineTo(550, signatureY + 15)
+           .stroke();
+        
+        doc.font('Helvetica-Bold').fontSize(12)
+           .text('DR. ROBERT GARCIA', 350, signatureY + 20, { width: 200, align: 'center' });
+        
+        doc.font('Helvetica').fontSize(10)
+           .text('Schools Division Superintendent', 350, signatureY + 35, { width: 200, align: 'center' });
+        
+        // Official seal text
         doc.moveDown(3);
+        doc.font('Helvetica-Oblique').fontSize(10)
+           .text('• This diploma is valid only with the official school seal •', { align: 'center' });
         
-        doc.font('Times-Roman').fontSize(18).text('has satisfactorily completed the requirements for Senior High School', { align: 'center' });
-        doc.text('prescribed by the Department of Education and is therefore awarded this', { align: 'center' });
-        doc.moveDown(2);
+        // Footer note
+        doc.moveTo(50, doc.page.height - 60)
+           .lineTo(doc.page.width - 50, doc.page.height - 60)
+           .stroke();
         
-        doc.font('Times-Bold').fontSize(40).text('DIPLOMA', { align: 'center' });
-        doc.moveDown(2);
+        doc.font('Helvetica').fontSize(8)
+           .text(`Diploma Serial No.: DPL-${student.LRN}-${new Date().getFullYear()} • Official Transcript Available Upon Request`, 
+           50, doc.page.height - 50, { width: doc.page.width - 100, align: 'center' });
         
-        doc.font('Times-Roman').fontSize(16).text('to', { align: 'center' });
-        doc.moveDown();
-        
-        const fullName = `${student.firstname} ${student.middlename || ''} ${student.lastname}`.toUpperCase();
-        doc.font('Helvetica-Bold').fontSize(28).text(fullName, { align: 'center', underline: true });
-        doc.moveDown(2);
-        
-        doc.font('Times-Roman').fontSize(14).text(`Signed this ${formatDate(new Date())} at Rodriguez, Rizal, Philippines.`, { align: 'center' });
-        
-        doc.moveDown(5);
-        const sigY = doc.y;
-        
-        doc.fontSize(12).font('Helvetica-Bold');
-        doc.text('SCHOOL PRINCIPAL', 100, sigY, { width: 250, align: 'center' });
-        doc.text('SCHOOLS DIVISION SUPERINTENDENT', 500, sigY, { width: 250, align: 'center' });
-        
-        doc.lineWidth(1)
-           .moveTo(125, sigY - 5).lineTo(325, sigY - 5).stroke()
-           .moveTo(525, sigY - 5).lineTo(725, sigY - 5).stroke();
-
         doc.end();
     } catch (error) {
+        console.error(error);
         res.status(500).send("Error generating diploma");
     }
 });
 
 export default router;
-
