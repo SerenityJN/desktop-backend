@@ -151,9 +151,7 @@ function addSignatureSection(doc, name, title, align = 'left', offsetX = 0) {
        });
 }
 
-router.get('/
-           
-           list', verifyAdmin, async (req, res) => {
+router.get('/list', verifyAdmin, async (req, res) => {
     try {
         const [students] = await db.query(
             `SELECT 
@@ -704,3 +702,4 @@ router.get('/generate/diploma/:lrn', verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
