@@ -36,32 +36,62 @@ async function drawLogo(doc, side, yPosition) {
 
 async function getStudentData(LRN) {
     try {
+        console.log('Fetching student data for LRN:', LRN);
+        
         const [students] = await db.query(
             `SELECT 
-                sd.*,
+                sd.LRN,
+                sd.firstname,
+                sd.lastname,
+                sd.middlename,
+                sd.suffix,
+                sd.birthdate,
+                sd.sex,
+                sd.address,
+                sd.yearlevel,
+                sd.strand,
+                sd.enrollment_status,
+                sd.GuardianName,
+                sd.GuardianContact,
                 g.FathersName,
                 g.FathersContact,
                 g.MothersName,
                 g.MothersContact,
-                g.GuardianName,
-                g.GuardianContact,
+                g.GuardianName as guardian_name,
+                g.GuardianContact as guardian_contact,
                 se.school_year,
                 se.semester,
-                se.status as enrollment_status,
+                se.status as enrollment_status_db,
                 se.enrollment_type,
-                se.yearlevel as enrolled_year_level,
+                se.year_level as enrolled_year_level,
                 se.strand as enrolled_strand
             FROM student_details sd
             LEFT JOIN guardians g ON sd.LRN = g.LRN
             LEFT JOIN student_enrollments se ON sd.LRN = se.LRN 
-                AND se.status = 'enrolled' 
+                AND se.status = 'enrolled'
+                AND se.id = (
+                    SELECT MAX(id) 
+                    FROM student_enrollments 
+                    WHERE LRN = sd.LRN AND status = 'enrolled'
+                )
             WHERE sd.LRN = ?
-            ORDER BY se.id DESC LIMIT 1`,
+            LIMIT 1`,
             [LRN]
         );
-        return students[0];
+        
+        console.log('Query result count:', students.length);
+        
+        if (students.length === 0) {
+            console.log('No student found with LRN:', LRN);
+            return null;
+        }
+        
+        const student = students[0];
+        return student;
+        
     } catch (error) {
         console.error('Error fetching student data:', error);
+        console.error('Error stack:', error.stack);
         throw error;
     }
 }
@@ -702,5 +732,6 @@ router.get('/generate/diploma/:lrn', verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
 
 
