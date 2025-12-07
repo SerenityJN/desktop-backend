@@ -40,19 +40,9 @@ async function getStudentData(LRN) {
         
         const [students] = await db.query(
             `SELECT 
-                sd.LRN,
-                sd.firstname,
-                sd.lastname,
-                sd.middlename,
-                sd.suffix,
-                sd.birthdate,
-                sd.sex,
-                sd.address,
+                sd.*,
                 sd.yearlevel as enrolled_year_level,
                 sd.strand as enrolled_strand,
-                sd.enrollment_status,
-                sd.GuardianName,
-                sd.GuardianContact,
                 g.FathersName,
                 g.FathersContact,
                 g.MothersName,
@@ -793,6 +783,7 @@ router.get('/generate/diploma/:lrn', verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
 
 
 
