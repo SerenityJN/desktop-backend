@@ -49,7 +49,7 @@ async function getStudentData(LRN) {
                 se.semester,
                 se.status as enrollment_status,
                 se.enrollment_type,
-                se.year_level as enrolled_year_level,
+                se.yearlevel as enrolled_year_level,
                 se.strand as enrolled_strand
             FROM student_details sd
             LEFT JOIN guardians g ON sd.LRN = g.LRN
@@ -702,4 +702,5 @@ router.get('/generate/diploma/:lrn', verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
 
