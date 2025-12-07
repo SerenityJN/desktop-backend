@@ -221,10 +221,47 @@ router.get('/search-documents', verifyAdmin, async (req, res) => {
 });
 
 router.get('/generate/enrollment/:lrn', verifyAdmin, async (req, res) => {
+    console.log('=== START: Enrollment PDF Generation ===');
+    console.log('Request for LRN:', req.params.lrn);
+    
     try {
+        // Test database connection first
+        console.log('Testing database connection...');
+        const [dbTest] = await db.query('SELECT 1 as test');
+        console.log('Database test result:', dbTest);
+        
+        console.log('Fetching student data...');
         const student = await getStudentData(req.params.lrn);
-        if (!student) return res.status(404).json({ message: 'Student not found' });
+        
+        if (!student) {
+            console.log('Student not found in database');
+            return res.status(404).json({ 
+                message: 'Student not found',
+                details: `No student found with LRN: ${req.params.lrn}`
+            });
+        }
+        
+        console.log('Student data retrieved:', {
+            LRN: student.LRN,
+            name: `${student.firstname} ${student.lastname}`,
+            yearlevel: student.yearlevel || student.enrolled_year_level,
+            strand: student.strand || student.enrolled_strand,
+            enrollment_status: student.enrollment_status
+        });
 
+        // Use fallback values
+        const yearLevel = student.enrolled_year_level || student.yearlevel || 'Grade 11';
+        const strand = student.enrolled_strand || student.strand || 'Not Specified';
+        const schoolYear = student.school_year || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+        const enrollmentType = student.enrollment_type || 'regular';
+        
+        console.log('Creating PDFDocument with values:', {
+            yearLevel,
+            strand,
+            schoolYear,
+            enrollmentType
+        });
+        
         const doc = new PDFDocument({ 
             margin: 50,
             size: 'A4',
@@ -235,8 +272,12 @@ router.get('/generate/enrollment/:lrn', verifyAdmin, async (req, res) => {
             }
         });
         
+        console.log('PDFDocument created successfully');
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="COE_${student.LRN}.pdf"`);
+        
+        console.log('Headers set, piping to response...');
         doc.pipe(res);
         
         // Formal header with logos
@@ -257,21 +298,18 @@ router.get('/generate/enrollment/:lrn', verifyAdmin, async (req, res) => {
            .moveDown();
         
         // Formal body text
-        const fullName = `${student.lastname}, ${student.firstname} ${student.middlename || ''} ${student.suffix || ''}`.toUpperCase();
-        const sy = student.school_year || new Date().getFullYear() + '-' + (new Date().getFullYear()+1);
-        const strand = student.enrolled_strand || student.strand || 'Not Specified';
-        const yearLevel = student.enrolled_year_level || 'Grade 11';
+        const fullName = `${student.lastname || ''}, ${student.firstname || ''} ${student.middlename || ''} ${student.suffix || ''}`.toUpperCase().trim();
         
         doc.font('Helvetica').fontSize(12)
-           .text(`This is to certify that ${fullName}, bearing Learner Reference Number (LRN) ${student.LRN}, is a bona fide student of Southville 8B Senior High School, located at San Isidro, Rodriguez, Rizal.`, 
+           .text(`This is to certify that ${fullName}, bearing Learner Reference Number (LRN) ${student.LRN || 'N/A'}, is a bona fide student of Southville 8B Senior High School, located at San Isidro, Rodriguez, Rizal.`, 
            { align: 'justify', indent: 30, lineGap: 5 })
            .moveDown();
         
-        doc.text(`The aforementioned student is currently enrolled as a ${yearLevel} student under the ${strand} strand for the School Year ${sy}.`, 
+        doc.text(`The aforementioned student is currently enrolled as a ${yearLevel} student under the ${strand} strand for the School Year ${schoolYear}.`, 
            { align: 'justify', indent: 30, lineGap: 5 })
            .moveDown();
         
-        doc.text(`This certification is issued upon the request of ${student.firstname} ${student.lastname} for whatever legal purpose it may serve, particularly for ${student.enrollment_type === 'transfer' ? 'transfer purposes' : 'scholarship application'}.`, 
+        doc.text(`This certification is issued upon the request of ${student.firstname || ''} ${student.lastname || ''} for whatever legal purpose it may serve, particularly for ${enrollmentType === 'transfer' ? 'transfer purposes' : 'scholarship application'}.`, 
            { align: 'justify', indent: 30, lineGap: 5 })
            .moveDown(2);
         
@@ -297,9 +335,34 @@ router.get('/generate/enrollment/:lrn', verifyAdmin, async (req, res) => {
            50, doc.page.height - 40, { width: doc.page.width - 100, align: 'center' });
         
         doc.end();
+        console.log('=== END: Enrollment PDF Generation - SUCCESS ===');
+        
     } catch (error) {
-        console.error(error);
-        res.status(500).send("Error generating document");
+        console.error('=== ERROR: Enrollment PDF Generation ===');
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        // More detailed error checking
+        if (error.code === 'MODULE_NOT_FOUND') {
+            console.error('Missing module error - check package.json');
+            console.error('Required: pdfkit package');
+        }
+        
+        if (error.code === 'ER_ACCESS_DENIED_ERROR' || error.code === 'ECONNREFUSED') {
+            console.error('Database connection error');
+        }
+        
+        if (error.message.includes('Cannot read properties') || error.message.includes('undefined')) {
+            console.error('Undefined value error - check student data structure');
+        }
+        
+        res.status(500).json({ 
+            message: 'Error generating document',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+            suggestion: 'Check server logs and database connection'
+        });
     }
 });
 
@@ -732,6 +795,7 @@ router.get('/generate/diploma/:lrn', verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
 
 
 
