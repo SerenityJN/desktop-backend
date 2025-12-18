@@ -215,54 +215,84 @@ router.post("/add", async (req, res) => {
   let conn;
 
   // 1. Basic Validation
-  if (!data.LRN || !data.lastname || !data.firstname || !data.strand || !data.email) {
+  if (!data.LRN || !data.lastname || !data.firstname || !data.strand) {
     return res.status(400).json({ success: false, message: "❌ Missing required fields." });
   }
 
   try {
-    // Get connection and start transaction
     conn = await db.getConnection();
     await conn.beginTransaction();
 
     // 2. Check for Duplicates
     const [exists] = await conn.query(
-      "SELECT 1 FROM student_details WHERE LRN = ? OR email = ?", 
-      [data.LRN, data.email]
+      "SELECT 1 FROM student_details WHERE LRN = ?", 
+      [data.LRN]
     );
 
     if (exists.length > 0) {
       await conn.rollback();
-      return res.status(400).json({ success: false, message: "LRN or Email is already registered." });
+      return res.status(400).json({ success: false, message: "LRN is already registered." });
     }
 
-    // 3. Prepare Data
-    // Desktop form sends FathersName/MothersName, Website uses guardian_name.
-    // We prioritize Guardian, then Father, then Mother.
-    const guardianName = data.GuardianName || data.FathersName || data.MothersName || "N/A";
-    const guardianContact = data.GuardianContact || data.FathersContact || data.MothersContact || "N/A";
-    
-    // Website combines address, Desktop sends it as 'home_add'. We use what we have.
-    const homeAddress = data.home_add; 
-
+    // 3. Prepare Defaults
     const studentType = data.student_type || "New Enrollee";
     const yearLevel = data.yearlevel || "Grade 11";
-
-    // 4. Insert into STUDENT_DETAILS
+    
+    // 4. Insert into STUDENT_DETAILS 
+    // Matches your provided schema: including IP community and 4Ps
     await conn.query(
       `INSERT INTO student_details 
         (LRN, firstname, lastname, middlename, suffix, age, sex, status, nationality, birthdate,
-          birth_municipality, birth_province, religion, cpnumber, home_add, email, yearlevel, strand, 
-         student_type, enrollment_status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())`,
+         birth_province, birth_municipality, religion, cpnumber, home_add, email, 
+         yearlevel, strand, student_type, enrollment_status, 
+         ip_community, ip_specify, fourps_beneficiary, fourps_id, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, 1, NOW())`,
       [
-        data.LRN, data.firstname, data.lastname, data.middlename || null, data.suffix, 
-        data.age, data.sex, "Single", "Filipino", data.birthdate,
-        data.birth_municipality || null, data.birth_province || null,, data.religion, data.cpnumber, homeAddress, data.email, yearLevel, data.strand,
+        data.LRN, 
+        data.firstname, 
+        data.lastname, 
+        data.middlename || null, 
+        data.suffix || null, 
+        data.age, 
+        data.sex, 
+        data.status || "Single", 
+        data.nationality || "Filipino", 
+        data.birthdate,
+        data.birth_province || null, 
+        data.birth_municipality || null, 
+        data.religion, 
+        data.cpnumber, 
+        data.home_add, 
+        data.email, 
+        yearLevel, 
+        data.strand,
         studentType,
+        // IP Community & 4Ps (Handle "Yes"/"No" logic from form or defaults)
+        data.ip_community || "No",
+        data.ip_specify || null,
+        data.fourps_beneficiary || "No",
+        data.fourps_id || null
       ]
     );
 
-    // 5. Insert into STUDENT_DOCUMENTS (Initialize with NULLs since Desktop doesn't upload files yet)
+    // 5. Insert into GUARDIANS Table
+    // Matches your specific guardians table columns
+    await conn.query(
+      `INSERT INTO guardians 
+        (LRN, FathersName, FathersContact, MothersName, MothersContact, GuardianName, GuardianContact) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.LRN, 
+        data.FathersName || null, 
+        data.FathersContact || null,
+        data.MothersName || null,
+        data.MothersContact || null,
+        data.GuardianName || null,
+        data.GuardianContact || null
+      ]
+    );
+
+    // 6. Insert into STUDENT_DOCUMENTS
     await conn.query(
       `INSERT INTO student_documents 
        (LRN, birth_cert, form137, good_moral, report_card, transcript_records, honorable_dismissal)
@@ -270,15 +300,8 @@ router.post("/add", async (req, res) => {
       [data.LRN]
     );
 
-    // 6. Insert into GUARDIANS Table
-    await conn.query(
-      `INSERT INTO guardians (LRN, name, contact) VALUES (?, ?, ?)`,
-      [data.LRN, guardianName, guardianContact]
-    );
-
     // 7. Generate Reference & Insert into STUDENT_ACCOUNTS
-    // Using your website logic: SV8BSHS + LRN padded
-    const reference = "SV8BSHS-" + String(data.LRN).slice(-6); // Safer to take last 6 digits
+    const reference = "SV8BSHS-" + String(data.LRN).slice(-6); 
 
     await conn.query(
       `INSERT INTO student_accounts (LRN, track_code) VALUES (?, ?)`,
@@ -288,62 +311,38 @@ router.post("/add", async (req, res) => {
     // 8. Insert into STUDENT_ENROLLMENTS
     const now = new Date(); 
     const currentYear = now.getFullYear();
-    // Logic: If current month is June (5) or later, it's start of SY (e.g. 2025-2026)
     const school_year = (now.getMonth() >= 5) 
         ? `${currentYear}-${currentYear + 1}` 
         : `${currentYear - 1}-${currentYear}`;
 
     await conn.query(
-      `INSERT INTO student_enrollments 
-      (LRN, school_year, semester, status)
-      VALUES (?, ?, ?, ?)`,
-      [data.LRN, school_year, data.semester || "1st Semester", "Pending"]
+      `INSERT INTO student_enrollments (LRN, school_year, semester, status) VALUES (?, ?, ?, ?)`,
+      [data.LRN, school_year, "1st", "Pending"]
     );
 
     // 9. COMMIT TRANSACTION
     await conn.commit();
 
-    // 10. Send Email (Exactly like your website)
-    // Wrapped in try/catch so email failure doesn't crash the response
-    try {
-      await sendEnrollmentEmail(
-        data.email,
-        "🎓 SVSHS Enrollment Confirmation",
-        `
-        <div style="font-family:'Segoe UI',Arial,sans-serif;line-height:1.6;color:#333;background-color:#f8fafc;padding:20px;">
-          <div style="max-width:600px;background:#fff;margin:auto;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,0.05);overflow:hidden;">
-            <div style="background:#1e40af;color:#fff;text-align:center;padding:20px;">
-              <h2 style="margin:0;">SVSHS Enrollment Confirmation</h2>
-            </div>
-            <div style="padding:25px;">
-              <p>Dear <strong>${data.firstname} ${data.lastname}</strong>,</p>
-              <p>Thank you for enrolling at <strong>Southville 8B Senior High School (SV8BSHS)</strong>!</p>
-              <p>Your application has been successfully recorded by the Admin.</p>
-
-              <p style="margin-top:20px;font-size:1.1em;">
-                <strong>Reference Number:</strong> 
-                <span style="display:inline-block;background:#f1f5f9;padding:8px 12px;border-radius:6px;margin-top:4px;">
-                  ${reference}
-                </span>
-              </p>
-
-              <p>Use this reference number to track your enrollment status.</p>
-
-              <hr style="border:none;border-top:1px solid #e5e7eb;margin:30px 0;">
-              <p style="font-size:0.9em;color:#666;">This is an automated message — please do not reply.</p>
-              <p style="text-align:center;color:#aaa;font-size:0.8em;margin-top:20px;">
-                © ${currentYear} San Vicente Senior High School. All rights reserved.
-              </p>
+    // 10. Send Email
+    if (data.email) {
+      try {
+        await sendEnrollmentEmail(
+          data.email,
+          "🎓 SVSHS Enrollment Confirmation",
+          `
+          <div style="font-family:Arial,sans-serif;padding:20px;background:#f4f4f4;">
+            <div style="max-width:600px;margin:auto;background:white;padding:20px;border-radius:8px;">
+              <h2 style="color:#1e40af;text-align:center;">Enrollment Recorded</h2>
+              <p>Dear <strong>${data.firstname}</strong>,</p>
+              <p>Your enrollment has been manually recorded.</p>
+              <p><strong>Reference Number:</strong> ${reference}</p>
             </div>
           </div>
-        </div>
-        `
-      );
-    } catch (mailError) {
-      console.error("⚠️ Email send failed:", mailError);
+          `
+        );
+      } catch (err) { console.error("Email warning:", err.message); }
     }
 
-    // 11. Success Response
     res.status(200).json({
       success: true,
       reference,
@@ -351,15 +350,11 @@ router.post("/add", async (req, res) => {
     });
 
   } catch (err) {
-    // Rollback if anything fails
     if (conn) await conn.rollback();
-    
-    console.error("❌ Enrollment Transaction Error:", err);
+    console.error("❌ Transaction Error:", err);
     res.status(500).json({
       success: false,
-      message: err.code === "ER_DUP_ENTRY"
-        ? "LRN or Email already exists."
-        : "An internal server error occurred: " + err.message,
+      message: "An internal server error occurred: " + err.message,
     });
   } finally {
     if (conn) conn.release();
@@ -684,5 +679,6 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
