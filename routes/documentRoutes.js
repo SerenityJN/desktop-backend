@@ -1,5 +1,6 @@
 import express from 'express';
 import db from "../models/db.js";
+import { sendEnrollmentEmail } from "../mailer/emailService.js";
 
 const router = express.Router();
 
@@ -271,3 +272,4 @@ router.post("/remind-missing", async (req, res) => {
 });
 
 export default router;
+
