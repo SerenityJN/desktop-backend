@@ -1,5 +1,4 @@
 import express from "express";
-const router = express.Router();
 import db from "../models/db.js";
 import bcrypt from "bcryptjs";
 import { sendEnrollmentEmail } from "../mailer/emailService.js";
