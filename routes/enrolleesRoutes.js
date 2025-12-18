@@ -251,13 +251,13 @@ router.post("/add", async (req, res) => {
     await conn.query(
       `INSERT INTO student_details 
         (LRN, firstname, lastname, middlename, suffix, age, sex, status, nationality, birthdate,
-         place_of_birth, religion, cpnumber, home_add, email, yearlevel, strand, 
+          birth_municipality, birth_province, religion, cpnumber, home_add, email, yearlevel, strand, 
          student_type, enrollment_status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())`,
       [
         data.LRN, data.firstname, data.lastname, data.middlename || null, data.suffix, 
         data.age, data.sex, "Single", "Filipino", data.birthdate,
-        data.place_of_birth, data.religion, data.cpnumber, homeAddress, data.email, yearLevel, data.strand,
+        data.birth_municipality || null, data.birth_province || null,, data.religion, data.cpnumber, homeAddress, data.email, yearLevel, data.strand,
         studentType,
       ]
     );
@@ -684,4 +684,5 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
