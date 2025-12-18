@@ -96,6 +96,19 @@ router.post('/verify', async (req, res) => {
       );
     }
 
+    // Log the verification action (optional but recommended)
+    try {
+      await db.execute(
+        `INSERT INTO document_verification_logs 
+         (LRN, document_type, action, verified_by, verified_at) 
+         VALUES (?, ?, 'verified', ?, NOW())`,
+        [LRN, documentType, verifiedBy || 'system']
+      );
+    } catch (logError) {
+      console.error('Failed to log verification:', logError);
+      // Continue even if logging fails
+    }
+
     res.json({
       success: true,
       message: `Document ${documentType} verified successfully`,
@@ -219,5 +232,42 @@ router.get('/student/:LRN', async (req, res) => {
   }
 });
 
-export default router;
+router.post("/remind-missing", async (req, res) => {
+  const { email, fullname, documentName } = req.body;
 
+  if (!email || !documentName) {
+    return res.status(400).json({ success: false, message: "Email and Document Name required." });
+  }
+
+  try {
+    // Using your existing mailer service
+    await sendEnrollmentEmail(
+      email,
+      `⚠️ Action Required: Missing ${documentName}`,
+      `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="color: #e67e22;">Missing Document Notification</h2>
+        <p>Dear <strong>${fullname}</strong>,</p>
+        <p>During the review of your enrollment application at <strong>Southville 8B Senior High School</strong>, our registrar noticed that the following document is missing or was not clearly uploaded:</p>
+        
+        <div style="background: #fff3cd; padding: 15px; border-left: 5px solid #ffc107; margin: 20px 0; font-weight: bold;">
+          Required Document: ${documentName}
+        </div>
+
+        <p>Please log in to the student portal or contact the registrar's office to submit this document as soon as possible to avoid delays in your enrollment process.</p>
+        
+        <p>Thank you,<br><strong>SV8BSHS Registrar Office</strong></p>
+        <hr style="border:none; border-top:1px solid #eee;">
+        <small style="color: #888;">This is an automated reminder. Please do not reply directly to this email.</small>
+      </div>
+      `
+    );
+
+    res.json({ success: true, message: "Reminder email sent." });
+  } catch (error) {
+    console.error("Mailer Error:", error);
+    res.status(500).json({ success: false, message: "Error sending email reminder." });
+  }
+});
+
+export default router;
