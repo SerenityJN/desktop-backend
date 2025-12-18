@@ -119,43 +119,71 @@ router.get("/secondsemester", async (req, res) => {
 });
 
 router.post("/students/approve", async (req, res) => {
+  const conn = await db.getConnection(); // Use a connection for transactions
   try {
     const { LRN } = req.body;
     
-    // Get current school year (you might want to make this dynamic)
-    const currentSchoolYear = '2025-2026';
+    if (!LRN) {
+      return res.status(400).json({ error: "LRN is required" });
+    }
+
+    // Get current school year (Ensure this matches your database exactly)
+    const currentSchoolYear = '2025-2026'; 
     
-    // Get student details for password generation
-    const [studentData] = await db.query(
+    await conn.beginTransaction();
+
+    // 1. Get student details to make sure they exist
+    const [studentData] = await conn.query(
       'SELECT firstname, lastname FROM student_details WHERE LRN = ?',
       [LRN]
     );
     
     if (studentData.length === 0) {
-      return res.status(404).json({ error: "Student not found" });
+      await conn.rollback();
+      return res.status(404).json({ error: "Student not found in details" });
     }
     
     const student = studentData[0];
-  
-    const [result] = await db.query(`
+
+    // 2. Update enrollment record
+    // We removed "AND semester = '1st'" to make it more flexible, 
+    // just in case the row was already set to '2nd' during the application phase.
+    const [result] = await conn.query(`
       UPDATE student_enrollments 
       SET semester = '2nd', 
           status = 'Enrolled',
           rejection_reason = NULL,
-          updated_at = NOW(),
           enrollment_type = 'Regular'
-      WHERE LRN = ? AND school_year = ? AND semester = '1st'
+      WHERE LRN = ? AND school_year = ?
     `, [LRN, currentSchoolYear]);
+
+    if (result.affectedRows === 0) {
+       console.warn(`No enrollment record found for LRN: ${LRN} and SY: ${currentSchoolYear}`);
+       // We don't necessarily want to crash here, but we should know if it did nothing
+    }
     
-    // Update student status to Enrolled
-    await db.query(
+    // 3. Update overall student status
+    await conn.query(
       'UPDATE student_details SET enrollment_status = ? WHERE LRN = ?',
       ['Enrolled', LRN]
     );
-    
+
+    await conn.commit();
+
+    // ✅ CRITICAL FIX: SEND THE RESPONSE BACK TO FRONTEND
+    return res.status(200).json({ 
+      success: true, 
+      message: `Successfully approved ${student.firstname} ${student.lastname} for 2nd Semester!` 
+    });
+
   } catch (err) {
-    console.error("Error approving student:", err);
-    res.status(500).json({ error: "Failed to approve student" });
+    if (conn) await conn.rollback();
+    console.error("❌ SQL Error approving student:", err);
+    
+    // Send the specific error message to help you debug in the browser console
+    res.status(500).json({ error: "Internal Server Error", details: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
@@ -679,6 +707,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
