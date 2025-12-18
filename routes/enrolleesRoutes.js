@@ -252,16 +252,13 @@ router.post("/add", async (req, res) => {
       `INSERT INTO student_details 
         (LRN, firstname, lastname, middlename, suffix, age, sex, status, nationality, birthdate,
          place_of_birth, religion, cpnumber, home_add, email, yearlevel, strand, 
-         student_type, enrollment_status, created_at,
-         FathersName, FathersContact, MothersName, MothersContact, GuardianName, GuardianContact)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW(), ?, ?, ?, ?, ?, ?)`,
+         student_type, enrollment_status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())`,
       [
-        data.LRN, data.firstname, data.lastname, data.middlename || null, data.suffix || null, 
-        data.age, data.sex, "Single", "Filipino", data.birthdate, // Defaults for status/nationality if missing
-        null, data.religion, data.cpnumber, homeAddress, data.email, yearLevel, data.strand,
+        data.LRN, data.firstname, data.lastname, data.middlename || null, data.suffix, 
+        data.age, data.sex, "Single", "Filipino", data.birthdate,
+        data.place_of_birth, data.religion, data.cpnumber, homeAddress, data.email, yearLevel, data.strand,
         studentType,
-        // Extra parent columns for desktop compatibility
-        data.FathersName, data.FathersContact, data.MothersName, data.MothersContact, data.GuardianName, data.GuardianContact
       ]
     );
 
@@ -687,3 +684,4 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
