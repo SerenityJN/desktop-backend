@@ -115,6 +115,7 @@ router.get("/secondsemester", async (req, res) => {
       WHERE sd.enrollment_status = 'Enrolled' 
         AND se.semester = '1st' 
         AND se.status = 'pending'
+        AND se.enrollment_type = 'Continuing'
       ORDER BY se.created_at DESC
     `);
     res.json(rows);
@@ -693,6 +694,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
