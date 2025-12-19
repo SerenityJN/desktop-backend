@@ -86,13 +86,32 @@ router.get("/students", async (req, res) => {
     const [rows] = await db.query(`
       SELECT 
         sd.*,
-        se.semester
+        se.semester,
+        se.grade_slip,
+        doc.birth_cert,
+        doc.form137,
+        doc.good_moral,
+        doc.report_card,
+        doc.picture
       FROM student_details sd
       LEFT JOIN student_enrollments se ON sd.LRN = se.LRN
+      LEFT JOIN student_documents doc ON sd.LRN = doc.LRN
       WHERE sd.enrollment_status IN ('Enrolled', 'Temporary Enrolled')
       ORDER BY sd.lastname, sd.firstname
     `);
-    res.json(rows);
+    
+    // Ensure all document fields are included in the response
+    const formatted = rows.map(r => ({
+      ...r,
+      birth_cert: r.birth_cert || null,
+      form137: r.form137 || null,
+      good_moral: r.good_moral || null,
+      report_card: r.report_card || null,
+      picture: r.picture || null,
+      grade_slip: r.grade_slip || null
+    }));
+
+    res.json(formatted);
   } catch (err) {
     console.error("Error fetching enrolled students:", err);
     res.status(500).json({ error: "Failed to fetch enrolled students" });
@@ -699,6 +718,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
