@@ -103,10 +103,7 @@ router.get("/secondsemester", async (req, res) => {
   try {
    const [rows] = await db.query(`
       SELECT 
-        sd.LRN,
-        sd.firstname,
-        sd.lastname,
-        sd.strand,
+        sd.*,
         se.id AS enrollment_id,
         se.school_year,
         se.semester,
@@ -696,3 +693,4 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
