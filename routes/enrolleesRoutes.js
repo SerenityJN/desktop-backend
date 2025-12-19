@@ -484,7 +484,7 @@ router.post("/update-status", async (req, res) => {
           <p style="margin-top:10px;">This code was also provided in your previous email.</p>
 
           <p style="text-align:center;margin:30px 0;">
-            <a href="https://expo.dev/artifacts/eas/cHDTduGiqavaz43NmcK9sb.apk"
+            <a href="https://expo.dev/artifacts/eas/mVJUc8dzeB4ZrEFVia7wu8.apk"
               style="background-color:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">
               📱 Track Enrollment Status
             </a>
@@ -694,6 +694,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
