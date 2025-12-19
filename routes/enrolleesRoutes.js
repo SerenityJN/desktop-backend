@@ -113,7 +113,7 @@ router.get("/secondsemester", async (req, res) => {
       FROM student_details sd
       INNER JOIN student_enrollments se ON sd.LRN = se.LRN
       WHERE sd.enrollment_status = 'Enrolled' 
-        AND se.semester = '2nd' 
+        AND se.semester = '1nd' 
         AND se.status = 'pending'
       ORDER BY se.created_at DESC
     `);
@@ -693,4 +693,5 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
