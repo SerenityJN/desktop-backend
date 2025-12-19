@@ -318,12 +318,12 @@ router.post("/add", async (req, res) => {
     try {
       await sendEnrollmentEmail(
         data.email,
-        "🎓 SVSHS Enrollment Confirmation",
+        "🎓 SV8BSHS Enrollment Confirmation",
         `
         <div style="font-family:'Segoe UI',Arial,sans-serif;line-height:1.6;color:#333;background-color:#f8fafc;padding:20px;">
           <div style="max-width:600px;background:#fff;margin:auto;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,0.05);overflow:hidden;">
             <div style="background:#1e40af;color:#fff;text-align:center;padding:20px;">
-              <h2 style="margin:0;">SVSHS Enrollment Confirmation</h2>
+              <h2 style="margin:0;">SV8BSHS Enrollment Confirmation</h2>
             </div>
             <div style="padding:25px;">
               <p>Dear <strong>${data.firstname} ${data.lastname}</strong>,</p>
@@ -336,13 +336,18 @@ router.post("/add", async (req, res) => {
                   ${reference}
                 </span>
               </p>
-
+                <p style="text-align:center;margin:30px 0;">
+                  <a href="https://expo.dev/artifacts/eas/mVJUc8dzeB4ZrEFVia7wu8.apk"
+                    style="background-color:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">
+                    📱 Track Enrollment Status
+                  </a>
+                </p>
               <p>Use this reference number to track your enrollment status.</p>
 
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:30px 0;">
               <p style="font-size:0.9em;color:#666;">This is an automated message — please do not reply.</p>
               <p style="text-align:center;color:#aaa;font-size:0.8em;margin-top:20px;">
-                © ${currentYear} San Vicente Senior High School. All rights reserved.
+                © ${currentYear} Southville 8B Senior High School. All rights reserved.
               </p>
             </div>
           </div>
@@ -465,7 +470,7 @@ router.post("/update-status", async (req, res) => {
     <div style="font-family:'Segoe UI',Arial,sans-serif;line-height:1.6;color:#333;background-color:#f8fafc;padding:20px;">
       <div style="max-width:600px;background:#fff;margin:auto;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,0.05);overflow:hidden;">
         <div style="background:#1e40af;color:#fff;text-align:center;padding:20px;">
-          <h2 style="margin:0;">SVSHS Enrollment Status Update</h2>
+          <h2 style="margin:0;">SV8BSHS Enrollment Status Update</h2>
         </div>
         <div style="padding:25px;">
           <p>Dear <strong>${firstname} ${lastname}</strong>,</p>
@@ -524,9 +529,9 @@ router.post("/update-status", async (req, res) => {
                 <p style="margin:0 0 5px 0;"><strong>Student ID:</strong> ${reference}</p>
                 <p style="margin:0;"><strong>Password:</strong> ${plainPassword}</p>
             </div>
-            <p style="margin-top:25px;">You may now check your class schedule and important announcements through the app.</p>
+            <p style="margin-top:25px;">You may now check your account and important announcements through the app.</p>
             <p style="text-align:center;margin:30px 0;">
-              <a href="https://expo.dev/artifacts/eas/cHDTduGiqavaz43NmcK9sb.apk"
+              <a href="https://expo.dev/artifacts/eas/mVJUc8dzeB4ZrEFVia7wu8.apk"
                 style="background-color:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">
                 📱 Open Student App
               </a>
@@ -593,7 +598,7 @@ router.post("/update-status", async (req, res) => {
             </div>
 
             <p style="text-align:center;margin:30px 0;">
-              <a href="https://expo.dev/artifacts/eas/cHDTduGiqavaz43NmcK9sb.apk"
+              <a href="https://expo.dev/artifacts/eas/mVJUc8dzeB4ZrEFVia7wu8.apk"
                 style="background-color:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;display:inline-block;">
                 📱 Download Student App
               </a>
@@ -694,6 +699,7 @@ router.get("/check-account/:lrn", async (req, res) => {
 
 
 export default router;
+
 
 
 
