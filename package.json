@@ -217,6 +217,7 @@
     "pdfkit": "^0.17.2",
     "pe-library": "^0.4.1",
     "pend": "^1.2.0",
+    "pg": "^8.17.1",
     "picocolors": "^1.1.1",
     "plist": "^3.1.0",
     "postject": "^1.0.0-alpha.6",
