@@ -1,36 +1,37 @@
-import express from 'express';
-import db from "../models/db.js";
+import express from "express";
+import pool from "../models/db.js";
 import { sendEnrollmentEmail } from "../mailer/emailService.js";
 
 const router = express.Router();
 
-// GET /api/documents/verification-status/:LRN
-router.get('/verification-status/:LRN', async (req, res) => {
+/* =============================
+   GET VERIFICATION STATUS
+============================= */
+router.get("/verification-status/:LRN", async (req, res) => {
   try {
     const { LRN } = req.params;
 
-    const [documents] = await db.execute(
+    const { rows } = await pool.query(
       `SELECT 
         birth_cert, form137, good_moral, report_card, picture,
         transcript_records, honorable_dismissal
        FROM student_documents 
-       WHERE LRN = ?`,
+       WHERE LRN = $1`,
       [LRN]
     );
 
-    if (documents.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
-        message: 'No document record found for this student'
+        message: "No document record found for this student",
       });
     }
 
-    const doc = documents[0];
-    
-    // Return verification status for all documents
+    const doc = rows[0];
+
     res.json({
       success: true,
-      LRN: LRN,
+      LRN,
       verificationStatus: {
         birth_cert: Boolean(doc.birth_cert),
         form137: Boolean(doc.form137),
@@ -38,228 +39,231 @@ router.get('/verification-status/:LRN', async (req, res) => {
         report_card: Boolean(doc.report_card),
         picture: Boolean(doc.picture),
         transcript_records: Boolean(doc.transcript_records),
-        honorable_dismissal: Boolean(doc.honorable_dismissal)
-      }
+        honorable_dismissal: Boolean(doc.honorable_dismissal),
+      },
     });
-
   } catch (error) {
-    console.error('Error fetching verification status:', error);
+    console.error("Error fetching verification status:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error while fetching verification status'
+      message: "Server error while fetching verification status",
     });
   }
 });
 
-// POST /api/documents/verify
-router.post('/verify', async (req, res) => {
+/* =============================
+   VERIFY DOCUMENT
+============================= */
+router.post("/verify", async (req, res) => {
   try {
     const { LRN, documentType, verifiedBy } = req.body;
 
-    // Validate required fields
     if (!LRN || !documentType) {
       return res.status(400).json({
         success: false,
-        message: 'LRN and documentType are required'
+        message: "LRN and documentType are required",
       });
     }
 
-    // Validate document type
     const validDocumentTypes = [
-      'birth_cert', 'form137', 'good_moral', 'report_card', 'picture',
-      'transcript_records', 'honorable_dismissal'
+      "birth_cert",
+      "form137",
+      "good_moral",
+      "report_card",
+      "picture",
+      "transcript_records",
+      "honorable_dismissal",
     ];
 
     if (!validDocumentTypes.includes(documentType)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid document type'
+        message: "Invalid document type",
       });
     }
 
-    // First, check if student_documents record exists
-    const [existingRecords] = await db.execute(
-      'SELECT id FROM student_documents WHERE LRN = ?',
+    const { rows } = await pool.query(
+      "SELECT id FROM student_documents WHERE LRN = $1",
       [LRN]
     );
 
-    if (existingRecords.length === 0) {
-      // Create initial record if it doesn't exist
-      await db.execute(
-        `INSERT INTO student_documents (LRN, ${documentType}) VALUES (?, ?)`,
+    if (!rows.length) {
+      await pool.query(
+        `INSERT INTO student_documents (LRN, ${documentType})
+         VALUES ($1, $2)`,
         [LRN, true]
       );
     } else {
-      // Update existing record
-      await db.execute(
-        `UPDATE student_documents SET ${documentType} = ? WHERE LRN = ?`,
+      await pool.query(
+        `UPDATE student_documents
+         SET ${documentType} = $1
+         WHERE LRN = $2`,
         [true, LRN]
       );
     }
 
-    // Log the verification action (optional but recommended)
+    // Log action
     try {
-      await db.execute(
-        `INSERT INTO document_verification_logs 
-         (LRN, document_type, action, verified_by, verified_at) 
-         VALUES (?, ?, 'verified', ?, NOW())`,
-        [LRN, documentType, verifiedBy || 'system']
+      await pool.query(
+        `INSERT INTO document_verification_logs
+         (LRN, document_type, action, verified_by, verified_at)
+         VALUES ($1, $2, 'verified', $3, NOW())`,
+        [LRN, documentType, verifiedBy || "system"]
       );
     } catch (logError) {
-      console.error('Failed to log verification:', logError);
-      // Continue even if logging fails
+      console.error("Failed to log verification:", logError);
     }
 
     res.json({
       success: true,
       message: `Document ${documentType} verified successfully`,
-      LRN: LRN,
-      documentType: documentType,
-      verified: true
+      LRN,
+      documentType,
+      verified: true,
     });
-
   } catch (error) {
-    console.error('Error verifying document:', error);
+    console.error("Error verifying document:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error while verifying document'
+      message: "Server error while verifying document",
     });
   }
 });
 
-// POST /api/documents/unverify
-router.post('/unverify', async (req, res) => {
+/* =============================
+   UNVERIFY DOCUMENT
+============================= */
+router.post("/unverify", async (req, res) => {
   try {
     const { LRN, documentType } = req.body;
 
-    // Validate required fields
     if (!LRN || !documentType) {
       return res.status(400).json({
         success: false,
-        message: 'LRN and documentType are required'
+        message: "LRN and documentType are required",
       });
     }
 
-    // Validate document type
     const validDocumentTypes = [
-      'birth_cert', 'form137', 'good_moral', 'report_card', 'picture',
-      'transcript_records', 'honorable_dismissal'
+      "birth_cert",
+      "form137",
+      "good_moral",
+      "report_card",
+      "picture",
+      "transcript_records",
+      "honorable_dismissal",
     ];
 
     if (!validDocumentTypes.includes(documentType)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid document type'
+        message: "Invalid document type",
       });
     }
 
-    // Check if record exists
-    const [existingRecords] = await db.execute(
-      'SELECT id FROM student_documents WHERE LRN = ?',
+    const { rows } = await pool.query(
+      "SELECT id FROM student_documents WHERE LRN = $1",
       [LRN]
     );
 
-    if (existingRecords.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
-        message: 'No document record found for this student'
+        message: "No document record found for this student",
       });
     }
 
-    // Update the document verification status to false
-    await db.execute(
-      `UPDATE student_documents SET ${documentType} = ? WHERE LRN = ?`,
+    await pool.query(
+      `UPDATE student_documents
+       SET ${documentType} = $1
+       WHERE LRN = $2`,
       [false, LRN]
     );
 
-    // Log the unverification action
     try {
-      await db.execute(
-        `INSERT INTO document_verification_logs 
-         (LRN, document_type, action, verified_by, verified_at) 
-         VALUES (?, ?, 'unverified', ?, NOW())`,
-        [LRN, documentType, 'system']
+      await pool.query(
+        `INSERT INTO document_verification_logs
+         (LRN, document_type, action, verified_by, verified_at)
+         VALUES ($1, $2, 'unverified', $3, NOW())`,
+        [LRN, documentType, "system"]
       );
     } catch (logError) {
-      console.error('Failed to log unverification:', logError);
-      // Continue even if logging fails
+      console.error("Failed to log unverification:", logError);
     }
 
     res.json({
       success: true,
       message: `Document ${documentType} verification removed`,
-      LRN: LRN,
-      documentType: documentType,
-      verified: false
+      LRN,
+      documentType,
+      verified: false,
     });
-
   } catch (error) {
-    console.error('Error removing document verification:', error);
+    console.error("Error removing document verification:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error while removing verification'
+      message: "Server error while removing verification",
     });
   }
 });
 
-// GET /api/documents/student/:LRN - Get all documents for a student
-router.get('/student/:LRN', async (req, res) => {
+/* =============================
+   GET ALL STUDENT DOCUMENTS
+============================= */
+router.get("/student/:LRN", async (req, res) => {
   try {
     const { LRN } = req.params;
 
-    const [documents] = await db.execute(
-      `SELECT * FROM student_documents WHERE LRN = ?`,
+    const { rows } = await pool.query(
+      "SELECT * FROM student_documents WHERE LRN = $1",
       [LRN]
     );
 
-    if (documents.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
-        message: 'No documents found for this student'
+        message: "No documents found for this student",
       });
     }
 
     res.json({
       success: true,
-      documents: documents[0]
+      documents: rows[0],
     });
-
   } catch (error) {
-    console.error('Error fetching student documents:', error);
+    console.error("Error fetching student documents:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error while fetching student documents'
+      message: "Server error while fetching student documents",
     });
   }
 });
 
+/* =============================
+   SEND REMINDER EMAIL
+============================= */
 router.post("/remind-missing", async (req, res) => {
   const { email, fullname, documentName } = req.body;
 
   if (!email || !documentName) {
-    return res.status(400).json({ success: false, message: "Email and Document Name required." });
+    return res.status(400).json({
+      success: false,
+      message: "Email and Document Name required.",
+    });
   }
 
   try {
-    // Using your existing mailer service
     await sendEnrollmentEmail(
       email,
       `⚠️ Action Required: Missing ${documentName}`,
       `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2 style="color: #e67e22;">Missing Document Notification</h2>
+      <div style="font-family: Arial;">
+        <h2>Missing Document Notification</h2>
         <p>Dear <strong>${fullname}</strong>,</p>
-        <p>During the review of your enrollment application at <strong>Southville 8B Senior High School</strong>, our registrar noticed that the following document is missing or was not clearly uploaded:</p>
-        
-        <div style="background: #fff3cd; padding: 15px; border-left: 5px solid #ffc107; margin: 20px 0; font-weight: bold;">
-          Required Document: ${documentName}
-        </div>
-
-        <p>Please log in to the student portal or contact the registrar's office to submit this document as soon as possible to avoid delays in your enrollment process.</p>
-        
-        <p>Thank you,<br><strong>SV8BSHS Registrar Office</strong></p>
-        <hr style="border:none; border-top:1px solid #eee;">
-        <small style="color: #888;">This is an automated reminder. Please do not reply directly to this email.</small>
+        <p>The following document is missing:</p>
+        <strong>${documentName}</strong>
+        <p>Please submit it as soon as possible.</p>
+        <p>SV8BSHS Registrar Office</p>
       </div>
       `
     );
@@ -267,9 +271,11 @@ router.post("/remind-missing", async (req, res) => {
     res.json({ success: true, message: "Reminder email sent." });
   } catch (error) {
     console.error("Mailer Error:", error);
-    res.status(500).json({ success: false, message: "Error sending email reminder." });
+    res.status(500).json({
+      success: false,
+      message: "Error sending email reminder.",
+    });
   }
 });
 
 export default router;
-
