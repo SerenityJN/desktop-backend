@@ -8,7 +8,7 @@ router.get('/student-data', async (req, res) => {
   try {
     const query = `
       SELECT 
-        sd.LRN,
+        sd."LRN",
         sd.firstname,
         sd.lastname, 
         sd.middlename,
@@ -38,28 +38,28 @@ router.get('/student-data', async (req, res) => {
         se.status as enrollment_status_detail,
         se.grade_slip,
         se.enrollment_type,
-        g.FathersName,
-        g.FathersContact,
-        g.MothersName,
-        g.MothersContact,
-        g.GuardianName,
-        g.GuardianContact
+        g."FathersName",
+        g."FathersContact", 
+        g."MothersName",
+        g."MothersContact",
+        g."GuardianName",
+        g."GuardianContact"
       FROM student_details sd
-      LEFT JOIN student_enrollments se ON sd.LRN = se.LRN
-      LEFT JOIN guardians g ON sd.LRN = g.LRN
+      LEFT JOIN student_enrollments se ON sd."LRN" = se."LRN"
+      LEFT JOIN guardians g ON sd."LRN" = g."LRN"
       WHERE sd.is_active = true 
       AND (sd.enrollment_status = 'Enrolled' OR sd.enrollment_status = 'Temporary Enrolled')
       ORDER BY sd.enrollment_status, sd.lastname, sd.firstname
     `;
 
-    const [results] = await db.execute(query);
+    // PostgreSQL uses query() which returns { rows } object
+    const { rows } = await db.query(query);
     
-    res.json(results);
+    res.json(rows);
   } catch (error) {
     console.error('Export error:', error);
     res.status(500).json({ error: 'Failed to export data' });
   }
 });
-
 
 export default router;
