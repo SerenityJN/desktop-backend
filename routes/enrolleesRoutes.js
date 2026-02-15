@@ -14,7 +14,7 @@ router.get("/under-review", async (req, res) => {
     const { rows } = await db.query(`
       SELECT *
       FROM student_details d
-      LEFT JOIN student_documents doc ON d."LRN" = doc."LRN"
+      LEFT JOIN student_documents doc ON d.lrn = doc.lrn
       WHERE d.enrollment_status IN ('Under Review', 'Temporary Enrolled')
       ORDER BY d.created_at DESC
     `);
@@ -44,7 +44,7 @@ router.get("/documents", async (req, res) => {
   try {
     const { rows } = await db.query(`
       SELECT 
-        d."LRN",
+        d.lrn,
         CONCAT(d.lastname, ', ', d.firstname) AS fullname,
         d.strand,
         d.student_type,
@@ -57,7 +57,7 @@ router.get("/documents", async (req, res) => {
         doc.transcript_records,
         doc.honorable_dismissal
       FROM student_details d
-      LEFT JOIN student_documents doc ON d."LRN" = doc."LRN"
+      LEFT JOIN student_documents doc ON d.lrn = doc.lrn
       ORDER BY d.created_at DESC
     `);
 
@@ -77,24 +77,26 @@ router.get("/documents", async (req, res) => {
   }
 });
 
-// Get students
+// ============================
+// 3️⃣ GET Enrolled Students
+// ============================
 router.get("/students", async (req, res) => {
   try {
     const { rows } = await db.query(`
       SELECT 
-        sd.*,
-        se.semester,
-        se.grade_slip,
-        doc.birth_cert,
-        doc.form137,
-        doc.good_moral,
-        doc.report_card,
-        doc.picture
-      FROM student_details sd
-      LEFT JOIN student_enrollments se ON sd."LRN" = se."LRN"
-      LEFT JOIN student_documents doc ON sd."LRN" = doc."LRN"
-      WHERE sd.enrollment_status IN ('Enrolled', 'Temporary Enrolled')
-      ORDER BY sd.lastname, sd.firstname
+        student_details.*,
+        student_enrollments.semester,
+        student_enrollments.grade_slip,
+        student_documents.birth_cert,
+        student_documents.form137,
+        student_documents.good_moral,
+        student_documents.report_card,
+        student_documents.picture
+      FROM student_details
+      LEFT JOIN student_enrollments ON student_details.lrn = student_enrollments.lrn
+      LEFT JOIN student_documents ON student_details.lrn = student_documents.lrn
+      WHERE student_details.enrollment_status IN ('Enrolled', 'Temporary Enrolled')
+      ORDER BY student_details.lastname, student_details.firstname
     `);
     
     // Ensure all document fields are included in the response
@@ -115,24 +117,27 @@ router.get("/students", async (req, res) => {
   }
 });
 
+// ============================
+// 4️⃣ GET Second Semester Students
+// ============================
 router.get("/secondsemester", async (req, res) => {
   try {
     const { rows } = await db.query(`
       SELECT 
-        sd.*,
-        se.id AS enrollment_id,
-        se.school_year,
-        se.semester,
-        se.status AS sem_status,
-        se.grade_slip,
-        se.created_at
-      FROM student_details sd
-      INNER JOIN student_enrollments se ON sd."LRN" = se."LRN"
-      WHERE sd.enrollment_status = 'Enrolled' 
-        AND se.semester = '1st' 
-        AND se.status = 'pending'
-        AND se.enrollment_type = 'Continuing'
-      ORDER BY se.created_at DESC
+        student_details.*,
+        student_enrollments.id AS enrollment_id,
+        student_enrollments.school_year,
+        student_enrollments.semester,
+        student_enrollments.status AS sem_status,
+        student_enrollments.grade_slip,
+        student_enrollments.created_at
+      FROM student_details
+      INNER JOIN student_enrollments ON student_details.lrn = student_enrollments.lrn
+      WHERE student_details.enrollment_status = 'Enrolled' 
+        AND student_enrollments.semester = '1st' 
+        AND student_enrollments.status = 'pending'
+        AND student_enrollments.enrollment_type = 'Continuing'
+      ORDER BY student_enrollments.created_at DESC
     `);
     res.json(rows);
   } catch (err) {
@@ -141,6 +146,9 @@ router.get("/secondsemester", async (req, res) => {
   }
 });
 
+// ============================
+// 5️⃣ Approve Student for Second Semester
+// ============================
 router.post("/students/approve", async (req, res) => {
   try {
     const { LRN } = req.body;
@@ -150,7 +158,7 @@ router.post("/students/approve", async (req, res) => {
     
     // Get student details for password generation
     const { rows: studentData } = await db.query(
-      'SELECT firstname, lastname FROM student_details WHERE "LRN" = $1',
+      'SELECT firstname, lastname FROM student_details WHERE lrn = $1',
       [LRN]
     );
     
@@ -167,12 +175,12 @@ router.post("/students/approve", async (req, res) => {
           rejection_reason = NULL,
           updated_at = NOW(),
           enrollment_type = 'Regular'
-      WHERE "LRN" = $1 AND school_year = $2 AND semester = '1st'
+      WHERE lrn = $1 AND school_year = $2 AND semester = '1st'
     `, [LRN, currentSchoolYear]);
     
     // Update student status to Enrolled
     await db.query(
-      'UPDATE student_details SET enrollment_status = $1 WHERE "LRN" = $2',
+      'UPDATE student_details SET enrollment_status = $1 WHERE lrn = $2',
       ['Enrolled', LRN]
     );
     
@@ -184,7 +192,7 @@ router.post("/students/approve", async (req, res) => {
 });
 
 // ============================
-// 3️⃣ GET all "New Enrollees"
+// 6️⃣ GET all "New Enrollees" (Pending)
 // ============================
 router.get("/", async (req, res) => {
   try {
@@ -192,7 +200,7 @@ router.get("/", async (req, res) => {
     
     const { rows } = await db.query(`
       SELECT
-        d."LRN",
+        d.lrn,
         d.firstname,
         d.lastname,
         d.sex,
@@ -209,7 +217,7 @@ router.get("/", async (req, res) => {
         doc.transcript_records,
         doc.honorable_dismissal
       FROM student_details d
-      LEFT JOIN student_documents doc ON d."LRN" = doc."LRN"
+      LEFT JOIN student_documents doc ON d.lrn = doc.lrn
       WHERE d.enrollment_status = 'Pending'
       ORDER BY d.created_at DESC
     `);
@@ -243,7 +251,7 @@ router.get("/", async (req, res) => {
 });
 
 // ============================
-// 4️⃣ Add new enrollee
+// 7️⃣ Add new enrollee
 // ============================
 router.post("/add", async (req, res) => {
   const data = req.body;
@@ -260,7 +268,7 @@ router.post("/add", async (req, res) => {
 
     // 2. Check for Duplicates
     const { rows: exists } = await client.query(
-      "SELECT 1 FROM student_details WHERE \"LRN\" = $1 OR email = $2", 
+      "SELECT 1 FROM student_details WHERE lrn = $1 OR email = $2", 
       [data.LRN, data.email]
     );
 
@@ -279,7 +287,7 @@ router.post("/add", async (req, res) => {
     // 4. Insert into STUDENT_DETAILS
     await client.query(
       `INSERT INTO student_details 
-        ("LRN", firstname, lastname, middlename, suffix, age, sex, status, nationality, birthdate,
+        (lrn, firstname, lastname, middlename, suffix, age, sex, status, nationality, birthdate,
          place_of_birth, religion, cpnumber, home_add, email, yearlevel, strand, 
          student_type, enrollment_status, created_at,
          "FathersName", "FathersContact", "MothersName", "MothersContact", "GuardianName", "GuardianContact")
@@ -296,14 +304,14 @@ router.post("/add", async (req, res) => {
     // 5. Insert into STUDENT_DOCUMENTS
     await client.query(
       `INSERT INTO student_documents 
-       ("LRN", birth_cert, form137, good_moral, report_card, transcript_records, honorable_dismissal)
+       (lrn, birth_cert, form137, good_moral, report_card, transcript_records, honorable_dismissal)
        VALUES ($1, NULL, NULL, NULL, NULL, NULL, NULL)`,
       [data.LRN]
     );
 
     // 6. Insert into GUARDIANS Table
     await client.query(
-      `INSERT INTO guardians ("LRN", name, contact) VALUES ($1, $2, $3)`,
+      `INSERT INTO guardians (lrn, name, contact) VALUES ($1, $2, $3)`,
       [data.LRN, guardianName, guardianContact]
     );
 
@@ -311,7 +319,7 @@ router.post("/add", async (req, res) => {
     const reference = "SV8BSHS-" + String(data.LRN).slice(-6);
 
     await client.query(
-      `INSERT INTO student_accounts ("LRN", track_code) VALUES ($1, $2)`,
+      `INSERT INTO student_accounts (lrn, track_code) VALUES ($1, $2)`,
       [data.LRN, reference]
     );
 
@@ -324,7 +332,7 @@ router.post("/add", async (req, res) => {
 
     await client.query(
       `INSERT INTO student_enrollments 
-      ("LRN", school_year, semester, status)
+      (lrn, school_year, semester, status)
       VALUES ($1, $2, $3, $4)`,
       [data.LRN, school_year, data.semester || "1st Semester", "Pending"]
     );
@@ -406,12 +414,15 @@ router.post("/add", async (req, res) => {
   }
 });
 
+// ============================
+// 8️⃣ Delete Student
+// ============================
 router.post("/delete-student", async (req, res) => {
   try {
     const { LRN } = req.body;
     if (!LRN) return res.status(400).json({ message: "LRN is required" });
 
-    const { rowCount } = await db.query('DELETE FROM student_details WHERE "LRN" = $1', [LRN]);
+    const { rowCount } = await db.query('DELETE FROM student_details WHERE lrn = $1', [LRN]);
 
     if (rowCount === 0) {
       return res.status(404).json({ message: "Student not found" });
@@ -425,7 +436,7 @@ router.post("/delete-student", async (req, res) => {
 });
 
 // ============================
-// 5️⃣ Update enrollment_status (generic)
+// 9️⃣ Update enrollment_status (generic)
 // ============================
 router.post("/update-status", async (req, res) => {
   const { LRN, status, reason, plainPassword } = req.body;
@@ -438,12 +449,12 @@ router.post("/update-status", async (req, res) => {
     // ✅ Update student status + reason if needed
     if (status === "Rejected" || status === "Temporary Enrolled") {
       await db.query(
-        'UPDATE student_details SET enrollment_status = $1, reason = $2 WHERE "LRN" = $3',
+        'UPDATE student_details SET enrollment_status = $1, reason = $2 WHERE lrn = $3',
         [status, reason || null, LRN]
       );
     } else {
       await db.query(
-        'UPDATE student_details SET enrollment_status = $1, reason = NULL WHERE "LRN" = $2',
+        'UPDATE student_details SET enrollment_status = $1, reason = NULL WHERE lrn = $2',
         [status, LRN]
       );
     }
@@ -457,13 +468,13 @@ router.post("/update-status", async (req, res) => {
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
       await db.query(
-        'UPDATE student_accounts SET password = $1 WHERE "LRN" = $2',
+        'UPDATE student_accounts SET password = $1 WHERE lrn = $2',
         [hashedPassword, LRN]
       );
     }
 
     const { rows } = await db.query(
-      'SELECT firstname, lastname, email FROM student_details WHERE "LRN" = $1',
+      'SELECT firstname, lastname, email FROM student_details WHERE lrn = $1',
       [LRN]
     );
     
@@ -475,7 +486,7 @@ router.post("/update-status", async (req, res) => {
     const { firstname, lastname, email } = student;
 
     const { rows: accRows } = await db.query(
-      'SELECT track_code FROM student_accounts WHERE "LRN" = $1',
+      'SELECT track_code FROM student_accounts WHERE lrn = $1',
       [LRN]
     );
     const reference = accRows.length ? accRows[0].track_code : "N/A";
@@ -697,11 +708,13 @@ router.post("/update-status", async (req, res) => {
   }
 });
 
-// Check account
+// ============================
+// 🔟 Check account
+// ============================
 router.get("/check-account/:lrn", async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT password FROM student_accounts WHERE "LRN" = $1',
+      'SELECT password FROM student_accounts WHERE lrn = $1',
       [req.params.lrn]
     );
     
@@ -718,4 +731,3 @@ router.get("/check-account/:lrn", async (req, res) => {
 });
 
 export default router;
-
