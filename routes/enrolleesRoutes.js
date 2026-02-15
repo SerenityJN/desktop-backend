@@ -7,6 +7,33 @@ import { sendEnrollmentEmail } from "../mailer/emailService.js";
 const BASE_URL = "http://localhost:8000/uploads/";
 
 // ============================
+// Middleware for validation
+// ============================
+const validateUpdateStatus = (req, res, next) => {
+  const { LRN, status } = req.body;
+  
+  console.log("📥 Validating update-status request:", { LRN, status });
+  
+  if (!LRN) {
+    return res.status(400).json({ 
+      success: false,
+      message: "❌ LRN is required",
+      received: req.body 
+    });
+  }
+  
+  if (!status) {
+    return res.status(400).json({ 
+      success: false,
+      message: "❌ Status is required",
+      received: req.body 
+    });
+  }
+  
+  next();
+};
+
+// ============================
 // 1️⃣ GET all "Under Review" students (for Evaluation page)
 // ============================
 router.get("/under-review", async (req, res) => {
@@ -152,6 +179,10 @@ router.get("/secondsemester", async (req, res) => {
 router.post("/students/approve", async (req, res) => {
   try {
     const { LRN } = req.body;
+    
+    if (!LRN) {
+      return res.status(400).json({ error: "LRN is required" });
+    }
     
     // Get current school year (you might want to make this dynamic)
     const currentSchoolYear = '2025-2026';
@@ -436,55 +467,74 @@ router.post("/delete-student", async (req, res) => {
 });
 
 // ============================
-// 9️⃣ Update enrollment_status (generic)
+// 9️⃣ Update enrollment_status (generic) - FIXED VERSION
 // ============================
-router.post("/update-status", async (req, res) => {
+router.post("/update-status", validateUpdateStatus, async (req, res) => {
   const { LRN, status, reason, plainPassword } = req.body;
 
-  if (!LRN || !status) {
-    return res.status(400).json({ message: "❌ Missing LRN or status" });
-  }
+  // Enhanced logging for debugging
+  console.log("📥 Processing update-status request:", {
+    LRN: LRN,
+    status: status,
+    hasPassword: !!plainPassword,
+    reasonProvided: !!reason
+  });
 
   try {
+    // Check if student exists first
+    const { rows: studentCheck } = await db.query(
+      'SELECT firstname, lastname, email FROM student_details WHERE lrn = $1',
+      [LRN]
+    );
+    
+    if (studentCheck.length === 0) {
+      console.error(`❌ Student not found with LRN: ${LRN}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "❌ Student not found",
+        lrn: LRN 
+      });
+    }
+
+    const student = studentCheck[0];
+    console.log(`✅ Found student: ${student.firstname} ${student.lastname} (${student.email})`);
+
     // ✅ Update student status + reason if needed
     if (status === "Rejected" || status === "Temporary Enrolled") {
       await db.query(
         'UPDATE student_details SET enrollment_status = $1, reason = $2 WHERE lrn = $3',
         [status, reason || null, LRN]
       );
+      console.log(`✅ Updated status to ${status} with reason: ${reason || 'None'}`);
     } else {
       await db.query(
         'UPDATE student_details SET enrollment_status = $1, reason = NULL WHERE lrn = $2',
         [status, LRN]
       );
+      console.log(`✅ Updated status to ${status}`);
     }
 
     // ✅ If enrolled → hash password + store in student_accounts
     if (status === "Enrolled" || status === "Temporary Enrolled") {
       if (!plainPassword) {
-        return res.status(400).json({ message: "❌ Plain password is required to complete enrollment." });
+        console.error("❌ Plain password is required but not provided");
+        return res.status(400).json({ 
+          success: false,
+          message: "❌ Plain password is required to complete enrollment." 
+        });
       }
 
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      console.log("✅ Password hashed successfully");
 
       await db.query(
         'UPDATE student_accounts SET password = $1 WHERE lrn = $2',
         [hashedPassword, LRN]
       );
+      console.log("✅ Password saved to database");
     }
 
-    const { rows } = await db.query(
-      'SELECT firstname, lastname, email FROM student_details WHERE lrn = $1',
-      [LRN]
-    );
-    
-    const student = rows[0];
-    if (!student) {
-      return res.status(404).json({ message: "❌ Student not found for email." });
-    }
-
-    const { firstname, lastname, email } = student;
-
+    // Get reference number
     const { rows: accRows } = await db.query(
       'SELECT track_code FROM student_accounts WHERE lrn = $1',
       [LRN]
@@ -506,7 +556,7 @@ router.post("/update-status", async (req, res) => {
           <h2 style="margin:0;">SV8BSHS Enrollment Status Update</h2>
         </div>
         <div style="padding:25px;">
-          <p>Dear <strong>${firstname} ${lastname}</strong>,</p>
+          <p>Dear <strong>${student.firstname} ${student.lastname}</strong>,</p>
 
           <p>Your enrollment submission has been <strong>successfully confirmed</strong> and is now currently under review by our <strong>Admissions Office</strong>.</p>
 
@@ -544,7 +594,10 @@ router.post("/update-status", async (req, res) => {
     // ================================
     else if (status === "Enrolled") {
       if (!plainPassword) {
-        return res.status(400).json({ message: "❌ Plain text password is required for the enrollment email." });
+        return res.status(400).json({ 
+          success: false,
+          message: "❌ Plain text password is required for the enrollment email." 
+        });
       }
 
       subject = "✅ SV8BSHS Enrollment Approved & Account Details";
@@ -555,7 +608,7 @@ router.post("/update-status", async (req, res) => {
             <h2 style="margin:0;">🎉 Enrollment Approved</h2>
           </div>
           <div style="padding:25px;">
-            <p>Dear <strong>${firstname} ${lastname}</strong>,</p>
+            <p>Dear <strong>${student.firstname} ${student.lastname}</strong>,</p>
             <p>Congratulations! Your enrollment at <strong>Southville 8B Senior High School (SV8BSHS)</strong> has been <strong>officially approved</strong>.</p>
             <p style="margin-top:25px;"><strong>Please keep your login credentials in a safe place.</strong> You will use these to access the SVSHS Student Mobile App.</p>
             <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin-top:10px;">
@@ -585,7 +638,10 @@ router.post("/update-status", async (req, res) => {
     // ================================
     else if (status === "Temporary Enrolled") {
       if (!plainPassword) {
-        return res.status(400).json({ message: "❌ Plain text password is required for the enrollment email." });
+        return res.status(400).json({ 
+          success: false,
+          message: "❌ Plain text password is required for the enrollment email." 
+        });
       }
       subject = "⏳ SV8BSHS - Temporary Enrollment Status";
       message = `
@@ -595,7 +651,7 @@ router.post("/update-status", async (req, res) => {
             <h2 style="margin:0;">⏳ Temporary Enrollment Granted</h2>
           </div>
           <div style="padding:25px;">
-            <p>Dear <strong>${firstname} ${lastname}</strong>,</p>
+            <p>Dear <strong>${student.firstname} ${student.lastname}</strong>,</p>
             
             <p>Your enrollment at <strong>Southville 8B Senior High School</strong> has been granted <strong>temporary status</strong>.</p>
 
@@ -671,7 +727,7 @@ router.post("/update-status", async (req, res) => {
             <h2 style="margin:0;">Enrollment Application Result</h2>
           </div>
           <div style="padding:25px;">
-            <p>Dear <strong>${firstname} ${lastname}</strong>,</p>
+            <p>Dear <strong>${student.firstname} ${student.lastname}</strong>,</p>
 
             <p>Thank you for applying to <strong>Southville 8B Senior High School</strong>.</p>
 
@@ -696,15 +752,30 @@ router.post("/update-status", async (req, res) => {
     }
 
     // ✅ Send Email
-    await sendEnrollmentEmail(email, subject, message);
-    console.log(`📧 Status email sent → ${email} (${status})`);
+    if (subject && message) {
+      try {
+        await sendEnrollmentEmail(student.email, subject, message);
+        console.log(`📧 Status email sent successfully to ${student.email} (${status})`);
+      } catch (mailError) {
+        console.error("⚠️ Email send failed but status updated:", mailError);
+        // Continue - don't fail the whole request if email fails
+      }
+    }
 
     // ✅ Final response
-    res.json({ message: `✅ Student ${LRN} updated to '${status}'. Email sent.` });
+    res.json({ 
+      success: true,
+      message: `✅ Student ${LRN} updated to '${status}'. Email sent.` 
+    });
 
   } catch (err) {
-    console.error("❌ Error:", err);
-    res.status(500).json({ message: "❌ Server Error" });
+    console.error("❌ Error in update-status:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "❌ Server Error",
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
@@ -713,9 +784,15 @@ router.post("/update-status", async (req, res) => {
 // ============================
 router.get("/check-account/:lrn", async (req, res) => {
   try {
+    const { lrn } = req.params;
+    
+    if (!lrn) {
+      return res.status(400).json({ error: "LRN is required" });
+    }
+    
     const { rows } = await db.query(
       'SELECT password FROM student_accounts WHERE lrn = $1',
-      [req.params.lrn]
+      [lrn]
     );
     
     const hasPassword = rows.length > 0 && rows[0].password && rows[0].password.trim() !== '';
@@ -728,6 +805,19 @@ router.get("/check-account/:lrn", async (req, res) => {
     console.error("Error checking account:", err);
     res.status(500).json({ error: "Failed to check account status" });
   }
+});
+
+// ============================
+// Debug endpoint to test request body
+// ============================
+router.post("/debug", (req, res) => {
+  console.log("🔍 DEBUG - Full request body:", req.body);
+  console.log("🔍 DEBUG - Headers:", req.headers);
+  
+  res.json({
+    receivedBody: req.body,
+    message: "Debug endpoint - check server logs"
+  });
 });
 
 export default router;
