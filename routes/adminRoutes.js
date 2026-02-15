@@ -15,7 +15,7 @@ router.post("/login", async (req, res) => {
   try {
     // Find admin by email
     const [rows] = await pool.query(
-      "SELECT * FROM admin_accounts WHERE email = ?",
+      "SELECT * FROM admin_accounts WHERE email = $1",
       [username]
     );
 
@@ -371,3 +371,4 @@ router.get("/accounts/stats", verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
