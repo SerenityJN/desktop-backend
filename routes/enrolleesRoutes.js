@@ -188,6 +188,8 @@ router.post("/students/approve", async (req, res) => {
 // ============================
 router.get("/", async (req, res) => {
   try {
+    console.log('Fetching pending enrollees...');
+    
     const { rows } = await db.query(`
       SELECT
         d."LRN",
@@ -212,6 +214,8 @@ router.get("/", async (req, res) => {
       ORDER BY d.created_at DESC
     `);
 
+    console.log(`Found ${rows.length} pending enrollees`);
+
     const students = rows.map((r) => ({
       ...r,
       birth_cert: r.birth_cert ? BASE_URL + r.birth_cert : null,
@@ -224,8 +228,17 @@ router.get("/", async (req, res) => {
 
     res.json(students);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
+    console.error("❌ Error in GET /enrollees:", err);
+    console.error("Error details:", {
+      message: err.message,
+      stack: err.stack,
+      code: err.code
+    });
+    res.status(500).json({ 
+      error: "Database error", 
+      details: err.message,
+      code: err.code 
+    });
   }
 });
 
@@ -705,3 +718,4 @@ router.get("/check-account/:lrn", async (req, res) => {
 });
 
 export default router;
+
