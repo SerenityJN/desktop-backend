@@ -3,14 +3,15 @@ import express from "express";
 import db from "../models/db.js";
 
 const router = express.Router();
+
 // Approve semester progression
 router.post('/approve-semester', async (req, res) => {
   try {
     const { LRN } = req.body;
     
     // Find the current enrollment record
-    const [currentEnrollment] = await db.execute(
-      'SELECT * FROM student_enrollments WHERE LRN = ? AND school_year = ? ORDER BY created_at DESC LIMIT 1',
+    const { rows: currentEnrollment } = await db.query(
+      'SELECT * FROM student_enrollments WHERE "LRN" = $1 AND school_year = $2 ORDER BY created_at DESC LIMIT 1',
       [LRN, '2025-2026']
     );
 
@@ -21,18 +22,18 @@ router.post('/approve-semester', async (req, res) => {
     const currentRecord = currentEnrollment[0];
     
     // Get student data for password generation
-    const [studentData] = await db.execute(
-      'SELECT lastname FROM students WHERE LRN = ?',
+    const { rows: studentData } = await db.query(
+      'SELECT lastname FROM student_details WHERE "LRN" = $1',
       [LRN]
     );
 
     const student = studentData[0];
     
     // Create new record for 2nd semester
-    await db.execute(
-      `INSERT INTO enrollments 
-       (LRN, school_year, semester, status, grade_slip, rejection_reason, enrollment_type) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    await db.query(
+      `INSERT INTO student_enrollments 
+       ("LRN", school_year, semester, status, grade_slip, rejection_reason, enrollment_type) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         LRN,
         '2025-2026',
@@ -46,7 +47,7 @@ router.post('/approve-semester', async (req, res) => {
 
     // Generate password
     const lastName = student.lastname.trim();
-    const lastFourOfLRN = LRN.slice(-4);
+    const lastFourOfLRN = String(LRN).slice(-4);
     const plainTextPassword = `SV8B-${lastName}${lastFourOfLRN}`;
 
     res.json({ 
@@ -66,23 +67,23 @@ router.post('/update-semester', async (req, res) => {
     const { LRN } = req.body;
     
     // Update the existing record
-    const [result] = await db.execute(
-      `UPDATE enrollments 
-       SET semester = ?, status = ?, rejection_reason = NULL 
-       WHERE LRN = ? AND school_year = ? AND semester = ?`,
+    const { rowCount } = await db.query(
+      `UPDATE student_enrollments 
+       SET semester = $1, status = $2, rejection_reason = NULL 
+       WHERE "LRN" = $3 AND school_year = $4 AND semester = $5`,
       ['2nd', 'Enrolled', LRN, '2025-2026', '1st']
     );
 
-    if (result.affectedRows > 0) {
+    if (rowCount > 0) {
       // Get student data for password
-      const [studentData] = await db.execute(
-        'SELECT lastname FROM students WHERE LRN = ?',
+      const { rows: studentData } = await db.query(
+        'SELECT lastname FROM student_details WHERE "LRN" = $1',
         [LRN]
       );
       
       const student = studentData[0];
       const lastName = student.lastname.trim();
-      const lastFourOfLRN = LRN.slice(-4);
+      const lastFourOfLRN = String(LRN).slice(-4);
       const plainTextPassword = `SV8B-${lastName}${lastFourOfLRN}`;
 
       res.json({ 
@@ -106,22 +107,24 @@ router.get('/students', async (req, res) => {
     let query = `
       SELECT e.*, s.firstname, s.lastname, s.middlename, s.suffix, s.strand, 
              s.cpnumber, s.home_add, s.student_type, s.enrollment_status
-      FROM enrollments e
-      LEFT JOIN students s ON e.LRN = s.LRN
+      FROM student_enrollments e
+      LEFT JOIN student_details s ON e."LRN" = s."LRN"
       WHERE e.status IN ('Enrolled', 'Temporary Enrolled')
     `;
     
     const params = [];
+    let paramIndex = 1;
     
     if (semester) {
-      query += ' AND e.semester = ?';
+      query += ` AND e.semester = $${paramIndex}`;
       params.push(semester);
+      paramIndex++;
     }
     
     query += ' ORDER BY e.created_at DESC';
     
-    const [students] = await db.execute(query, params);
-    res.json(students);
+    const { rows } = await db.query(query, params);
+    res.json(rows);
     
   } catch (error) {
     console.error('Error fetching students:', error);
@@ -134,8 +137,8 @@ router.get('/status/:LRN', async (req, res) => {
   try {
     const { LRN } = req.params;
     
-    const [enrollment] = await db.execute(
-      'SELECT * FROM enrollments WHERE LRN = ? AND school_year = ? ORDER BY created_at DESC LIMIT 1',
+    const { rows: enrollment } = await db.query(
+      'SELECT * FROM student_enrollments WHERE "LRN" = $1 AND school_year = $2 ORDER BY created_at DESC LIMIT 1',
       [LRN, '2025-2026']
     );
 
